@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Reset a USB hub port using uhubctl if available
 # Usage: sudo ./uhubctl_reset.sh <hub:port> e.g. 1-1.4
+MAINTENANCE_DESC="Power cycle USB hub port (requires uhubctl)"
+MAINTENANCE_ARGS="hubport"
+
 set -euo pipefail
 if [ $# -ne 1 ]; then
   echo "Usage: $0 <hub:port> (e.g. 1-1.4)"

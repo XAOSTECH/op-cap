@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Detect a USB capture device and print helpful info
 # Usage: sudo ./detect_device.sh [VID:PID]
+MAINTENANCE_DESC="Detect and display USB video device info"
+MAINTENANCE_ARGS="vidpid_optional"
+
 set -euo pipefail
 VIDPID=${1:-}
 

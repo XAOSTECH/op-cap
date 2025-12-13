@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Repair helper: attempt to recover a USB capture device by resetting, unbinding/binding driver and restarting services.
 # Usage: sudo ./repair.sh --vidpid 0bda:5821 [--hub 1-1.4] [--device /dev/video0]
+MAINTENANCE_DESC="Full recovery: reset, rebind, restart services"
+MAINTENANCE_ARGS="vidpid_and_hubport"
+
 set -euo pipefail
 VIDPID=""
 DEVICE=""
@@ -44,33 +47,49 @@ if [ -n "$HUBPORT" ]; then
 fi
 
 # Try USB reset via usb_reset.sh (VID:PID or device)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -n "$VIDPID" ]; then
   echo "Attempting USB reset for $VIDPID"
-  sudo "$PWD/usb_reset.sh" "$VIDPID" || true
+  sudo "$SCRIPT_DIR/usb_reset.sh" "$VIDPID" || true
 elif [ -n "$DEVICE" ]; then
   echo "Attempting USB reset for $DEVICE"
-  sudo "$PWD/usb_reset.sh" "$DEVICE" || true
+  sudo "$SCRIPT_DIR/usb_reset.sh" "$DEVICE" || true
 fi
 
 # Find sysfs device path and try unbind/bind driver
 if [ -n "$VIDPID" ]; then
   V=$(echo "$VIDPID" | cut -d: -f1)
   P=$(echo "$VIDPID" | cut -d: -f2)
-  SYSDEV=$(ls -d /sys/bus/usb/devices/* 2>/dev/null | while read D; do if [[ -f $D/idVendor && -f $D/idProduct ]]; then nv=$(cat $D/idVendor); np=$(cat $D/idProduct); if [[ "$nv" == "$V" && "$np" == "$P" ]]; then echo "$D"; fi; fi; done | head -n1)
+  SYSDEV=""
+  for D in /sys/bus/usb/devices/*-*; do
+    if [[ -f "$D/idVendor" && -f "$D/idProduct" ]]; then
+      nv=$(cat "$D/idVendor")
+      np=$(cat "$D/idProduct")
+      if [[ "$nv" == "$V" && "$np" == "$P" ]]; then
+        SYSDEV="$D"
+        break
+      fi
+    fi
+  done
 else
   SYSDEV=$(udevadm info -q path -n "$DEVICE" 2>/dev/null | sed 's,^/devices/,,') || true
   SYSDEV=/sys/bus/usb/devices/$(basename "$SYSDEV")
 fi
 
 if [ -n "$SYSDEV" ] && [ -d "$SYSDEV" ]; then
-  driver=$(basename $(readlink -f "$SYSDEV/driver" 2>/dev/null || true) || true)
   busid=$(basename "$SYSDEV")
-  if [ -n "$driver" ]; then
+  # Check if driver symlink actually exists
+  if [ -L "$SYSDEV/driver" ]; then
+    driver=$(basename $(readlink -f "$SYSDEV/driver"))
     echo "Unbinding $busid from $driver"
     echo -n "$busid" | sudo tee "$SYSDEV/driver/unbind" >/dev/null || true
     sleep 1
     echo -n "$busid" | sudo tee "$SYSDEV/driver/bind" >/dev/null || true
+  else
+    echo "No driver bound to $busid (device may be in broken state)"
   fi
+else
+  echo "Could not find device in sysfs"
 fi
 
 # Restart ffmpeg/service if requested

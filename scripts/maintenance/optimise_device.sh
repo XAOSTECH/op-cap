@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Optimize USB capture device for maximum performance and stability
 # Usage: sudo ./optimize_device.sh [VID:PID]
+MAINTENANCE_DESC="Disable autosuspend, optimize USB power"
+MAINTENANCE_ARGS="vidpid"
+
 set -euo pipefail
 
 VIDPID=${1:-${USB_CAPTURE_VIDPID:-}}

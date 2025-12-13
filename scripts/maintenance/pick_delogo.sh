@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # A helper to let a user pick delogo coordinates. Requires either 'slop' (visual selection) or manual input.
 # Usage: ./pick_delogo.sh /dev/video0
+MAINTENANCE_DESC="Visually select logo region to hide"
+MAINTENANCE_ARGS="device_path"
+
 set -euo pipefail
 DEV=${1:-/dev/video0}
 if [ ! -c "$DEV" ]; then

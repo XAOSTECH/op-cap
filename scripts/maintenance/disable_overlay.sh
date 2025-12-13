@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Try to disable on-screen logos/OSD using standard UVC controls (if supported)
 # Usage: sudo ./disable_overlay.sh /dev/video0
+MAINTENANCE_DESC="Remove on-screen logos/OSD from capture"
+MAINTENANCE_ARGS="device_path"
+
 set -euo pipefail
 
 DEV=${1:-/dev/video0}

@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 # FFmpeg pipeline: read from a physical capture device and write to v4l2loopback with optional filters
-# Usage: sudo ./feed.sh /dev/video0 /dev/video10 [resolution] [fps]
+# Features: buffer validation, adaptive resolution fallback, HDR passthrough, optional delogo/overlay
+# Usage: sudo ./feed.sh /dev/video0 /dev/video10 [resolution] [fps] [format]
 
 set -euo pipefail
+
 IN=${1:-/dev/video0}
 OUT=${2:-/dev/video10}
 VID_SIZE=${3:-${USB_CAPTURE_RES:-3840x2160}}
 FPS=${4:-${USB_CAPTURE_FPS:-30}}
-INPUT_FORMAT=${USB_CAPTURE_FORMAT:-NV12}
+INPUT_FORMAT=${5:-${USB_CAPTURE_FORMAT:-NV12}}
+
+# Buffer validation: detect corrupted frames and log warnings
+VALIDATE_BUFFERS=${USB_CAPTURE_VALIDATE_BUFFERS:-1}
+CORRUPT_FRAME_THRESHOLD=${USB_CAPTURE_CORRUPT_THRESHOLD:-5}  # consecutive corrupted frames before fallback
+FALLBACK_RES=${USB_CAPTURE_FALLBACK_RES:-1920x1080}  # fallback if corruption detected
 
 # HDR handling modes:
 #   0 = auto (trust device, no color interpretation - may cause startup delay)

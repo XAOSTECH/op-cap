@@ -2,5 +2,10 @@
 # Replace idVendor and idProduct with your hardware's VID and PID
 
 # Example: idVendor=="0bda" idProduct=="5821" for a Realtek-based device — adjust as needed
-ACTION=="add|change", SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="5821", SYMLINK+="usb-capture0"
-ACTION=="add|change", SUBSYSTEM=="usb", ATTR{idVendor}=="0bda", ATTR{idProduct}=="5821", TEST=="/sys/bus/usb/devices/%k/power/control", ATTR{power/control}:="on"
+# ACTION=="add|change", SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="5821", SYMLINK+="usb-capture0"
+# ACTION=="add|change", SUBSYSTEM=="usb", ATTR{idVendor}=="0bda", ATTR{idProduct}=="5821", TEST=="/sys/bus/usb/devices/%k/power/control", ATTR{power/control}:="on"
+
+# OPTIONAL: For broken firmware devices, keep unauthorized on boot to prevent initialization crashes
+# Replace 3188:1000 with your device's VID:PID
+# This prevents device firmware from running until you explicitly authorize it
+# ACTION=="add|change", SUBSYSTEM=="usb", ATTR{idVendor}=="3188", ATTR{idProduct}=="1000", ATTR{authorized}:="0"
