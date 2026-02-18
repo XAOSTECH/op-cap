@@ -1,0 +1,39 @@
+{
+  "name": "OP-CAP",
+  "image": "devcontrol/streaming:latest",
+  "remoteUser": "streaming",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/op-cap,type=bind,consistency=cached",
+  "workspaceFolder": "/workspaces/op-cap",
+  "runArgs": [
+    "--userns=keep-id","--shm-size=1g","--device=/dev/dri","--device=/dev/nvidia0","--device=/dev/nvidiactl","--device=/dev/nvidia-modeset","--device=/dev/nvidia-uvm","--device=/dev/nvidia-uvm-tools","--group-add=video","--group-add=render","--security-opt=label=disable"
+  ],
+  "mounts": [
+    "source=/run/user/1000/podman/podman.sock,target=/var/run/docker.sock,type=bind","source=${localEnv:XDG_RUNTIME_DIR}/${localEnv:WAYLAND_DISPLAY},target=/tmp/wayland-0,type=bind,readonly","source=/run/user/1000/wayland-0.lock,target=/tmp/wayland-0.lock,type=bind","source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind","source=/usr/lib/x86_64-linux-gnu/libcuda.so.1,target=/usr/lib/x86_64-linux-gnu/libcuda.so.1,type=bind,readonly","source=/usr/lib/x86_64-linux-gnu/libnvcuvid.so.1,target=/usr/lib/x86_64-linux-gnu/libnvcuvid.so.1,type=bind,readonly"
+  ],
+  "containerEnv": {
+    "GPG_KEY_ID": "",
+    "GITHUB_USER": "",
+    "DOCKER_HOST": "unix:///var/run/docker.sock",
+    "DISPLAY": "${localEnv:DISPLAY}",
+    "TZ": "Europe/Brussels",
+    "NVIDIA_VISIBLE_DEVICES": "all",
+    "NVIDIA_DRIVER_CAPABILITIES": "compute,video,utility",
+    "__NV_PRIME_RENDER_OFFLOAD": "1",
+    "__GLX_VENDOR_LIBRARY_NAME": "nvidia",
+    "WAYLAND_DISPLAY": "wayland-0",
+    "XDG_RUNTIME_DIR": "/tmp"
+  },
+  "postCreateCommand": "sudo chown -R 1000:1000 . 2>/dev/null || true && sudo chmod 755 /home/streaming 2>/dev/null || true && sudo chown -R 1000:1000 /home/streaming/.vscode-server 2>/dev/null || true && sudo mkdir -p /home/streaming/.gnupg /home/streaming/.ssh /home/streaming/.cache /home/streaming/.config && sudo chown 1000:1000 /home/streaming/.gnupg /home/streaming/.ssh /home/streaming/.cache /home/streaming/.config && sudo chmod 700 /home/streaming/.gnupg /home/streaming/.ssh && sudo chmod 755 /home/streaming/.cache /home/streaming/.config && sudo mkdir -p /run/user/1000/gnupg && sudo chown -R 1000:1000 /run/user/1000 2>/dev/null || true && ln -sf /tmp/wayland-0 /run/user/1000/wayland-0 2>/dev/null || true && git config --global --add safe.directory '*' && git config --global init.defaultBranch main && bash -c 'bash /opt/dev-control/scripts/alias-loading.sh <<< A'",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.cwd": "/workspaces/op-cap",
+        "git.enableSmartCommit": true,
+        "git.autofetch": true
+      },
+      "extensions": [
+        "github.copilot","github.copilot-chat","ms-vscode.cpptools","ms-python.python"
+      ]
+    }
+  }
+}
