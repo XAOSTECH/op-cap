@@ -254,84 +254,43 @@ LAUNCHER_EOF
 # Create safe launcher with USB device crash recovery
 create_safe_launcher() {
   local SAFE_SCRIPT="/usr/local/bin/obs-safe"
-  info "Creating OBS Safe Launcher with USB device crash recovery..."
+  info "Creating OBS Safe Launcher wrapper..."
 
   if [ ! -f "$BASEDIR/scripts/obs-safe-launch.sh" ]; then
     warning "obs-safe-launch.sh not found in $BASEDIR/scripts/"
-    info "  To create it manually, check: https://github.com/XAOSTECH/op-cap/blob/main/scripts/obs-safe-launch.sh"
     return 0
   fi
 
-  # Create a wrapper script that calls the actual launcher with the correct project directory
-  sudo tee "$SAFE_SCRIPT" > /dev/null << 'WRAPPER_EOF'
+  # Simpler wrapper that just calls the launcher with explicit BASEDIR
+  sudo tee "$SAFE_SCRIPT" > /dev/null << WRAPPER_EOF
 #!/usr/bin/env bash
-# OBS Safe Launcher Wrapper
-# Calls the actual obs-safe-launch.sh with the correct project directory
-# This wrapper is installed to /usr/local/bin for convenient access
+# OBS Safe Launcher for USB device crash recovery
+# Set PROJECT_DIR to your op-cap installation, or call with --basedir
 
-set -euo pipefail
+PROJECT_DIR="\${OBS_SAFE_BASEDIR:-$BASEDIR}"
 
-# Try to find the op-cap project directory
-# Priority: command-line arg > OBS_SAFE_BASEDIR env var > search in common locations > current dir
-BASEDIR=""
-
-# Check if --basedir is provided
-for arg in "$@"; do
-  if [[ "$arg" == "--basedir" ]]; then
-    BASEDIR="$2"
-    break
-  fi
-done
-
-# If not provided, check environment variable
-if [ -z "$BASEDIR" ] && [ -n "${OBS_SAFE_BASEDIR:-}" ]; then
-  BASEDIR="$OBS_SAFE_BASEDIR"
-elif [ -z "$BASEDIR" ]; then
-  # Try to find op-cap directory in common locations
-  for potential_dir in \
-    "/home/jnxlr/PRO/WEB/CST/op-cap" \
-    "$HOME/op-cap" \
-    "$HOME/projects/op-cap" \
-    "$HOME/src/op-cap" \
-    "/opt/op-cap" \
-    "$(pwd)"; do
-    if [ -f "$potential_dir/scripts/obs-safe-launch.sh" ]; then
-      BASEDIR="$potential_dir"
-      break
-    fi
-  done
-fi
-
-if [ -z "$BASEDIR" ] || [ ! -f "$BASEDIR/scripts/obs-safe-launch.sh" ]; then
-  echo "ERROR: Could not find op-cap project directory"
+if [ ! -f "\$PROJECT_DIR/scripts/obs-safe-launch.sh" ]; then
+  echo "ERROR: PROJECT_DIR not found: \$PROJECT_DIR"
   echo ""
-  echo "Usage: obs-safe --basedir /path/to/op-cap [--device /dev/video0] [--vidpid 3188:1000]"
-  echo ""
-  echo "Or set environment variable:"
+  echo "Set project directory first:"
   echo "  export OBS_SAFE_BASEDIR=/path/to/op-cap"
-  echo "  obs-safe [--device /dev/video0] [--vidpid 3188:1000]"
+  echo ""
+  echo "Or use obs-safe-launch directly:"
+  echo "  /usr/local/bin/obs-safe-launch --basedir /path/to/op-cap [OPTIONS]"
   exit 1
 fi
 
-# Call the actual launcher with the project directory
-exec "$BASEDIR/scripts/obs-safe-launch.sh" --basedir "$BASEDIR" "$@"
+exec "\$PROJECT_DIR/scripts/obs-safe-launch.sh" --basedir "\$PROJECT_DIR" "\$@"
 WRAPPER_EOF
 
   sudo chmod +x "$SAFE_SCRIPT"
   success "Created $SAFE_SCRIPT launcher"
   info ""
-  info "For USB capture device crash recovery, use:"
-  info "  obs-safe --device /dev/video0 --vidpid 3188:1000"
+  info "IMPORTANT: Set your project directory first:"
+  info "  export OBS_SAFE_BASEDIR=$BASEDIR"
   info ""
-  info "If auto-detection fails, set the project directory:"
-  info "  export OBS_SAFE_BASEDIR=/home/jnxlr/PRO/WEB/CST/op-cap"
-  info "  obs-safe --device /dev/video0 --vidpid 3188:1000"
-  info ""
-  info "This launcher:"
-  info "  - Monitors USB device health"
-  info "  - Auto-restarts OBS if it crashes"
-  info "  - Runs auto-reconnect for device recovery"
-  info "  - Logs all issues to ~/.cache/obs-safe-launch/"
+  info "Then use:"
+  info "  obs-safe --device /dev/v4l/by-id/usb-ITE_UGREEN_25173_00000001-video-index0 --vidpid 3188:1000"
   info ""
 }
 
