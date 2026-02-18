@@ -56,6 +56,41 @@ source /etc/profile.d/obs-wayland.sh
 obs
 ```
 
+### Launch OBS with USB Device Crash Recovery
+
+**For users with unstable USB capture devices** (e.g., UGREEN capture cards with motherboard USB-C connection issues):
+
+```bash
+# Enable automatic USB device recovery and crash handling
+obs-safe --device /dev/video0 --vidpid 3188:1000
+
+# Example with UGREEN 25173 (VID:PID from lsusb)
+obs-safe --device /dev/v4l/by-id/usb-ITE_UGREEN_25173_00000001-video-index0 --vidpid 3188:1000
+```
+
+This safe launcher:
+- **Monitors USB device health** in real-time
+- **Auto-restarts OBS** if it crashes due to device disconnection
+- **Runs auto-reconnect service** to recover disconnected devices
+- **Logs all crashes** to `~/.cache/obs-safe-launch/obs-crash-*.log` for analysis
+- **Prevents cascade failures** by isolating OBS from unstable hardware
+
+**Typical error symptoms this solves:**
+```
+error: v4l2-input: /dev/video0: select timed out
+error: v4l2-input: /dev/video0: failed to log status
+double free or corruption (out)
+Aborted (core dumped)
+```
+
+**To find your device VID:PID:**
+```bash
+lsusb | grep -i "your-device-name"
+# Output example: ID 3188:1000 ITE UGREEN 25173
+#                    ^^^^:^^^^
+#                    VID:PID
+```
+
 ## What the Script Does
 
 ### 1. Detects GPU Hardware
@@ -304,6 +339,117 @@ After running optimisation:
 - [ ] Can open and interact with projector window
 - [ ] PipeWire audio works: `pw-play /usr/share/sounds/freedesktop/stereo/complete.oga`
 - [ ] GPU hardware acceleration enabled in OBS settings
+
+## USB Capture Device Crash Recovery
+
+### Problem: OBS Crashing with "double free or corruption" on USB Disconnect
+
+When a USB capture device becomes unstable (e.g., loose motherboard USB-C connection), OBS crashes with:
+
+```
+error: v4l2-input: /dev/video0: select timed out
+error: v4l2-input: /dev/video0: failed to log status
+...
+double free or corruption (out)
+Aborted (core dumped)
+```
+
+### Root Cause
+
+The v4l2 driver in OBS directly accesses the USB device. When the device becomes unreliable or disconnects:
+1. v4l2-input driver times out waiting for data
+2. Buffer allocation fails within OBS's memory pool
+3. OBS crashes with heap corruption, taking down the entire application
+
+### Solution: Use `obs-safe` Launcher with Auto-Recovery
+
+The `obs-safe` launcher isolates OBS from USB hardware through device monitoring and auto-restart:
+
+```bash
+# Start OBS with USB device recovery enabled
+obs-safe --device /dev/video0 --vidpid 3188:1000
+
+# With full path (more reliable device identification)
+obs-safe --device /dev/v4l/by-id/usb-ITE_UGREEN_25173_00000001-video-index0 --vidpid 3188:1000
+```
+
+### How It Works
+
+1. **Pre-flight checks:** Verifies USB device state before launch
+2. **Auto-reconnect monitor:** Runs in background, watches device for disconnections
+3. **OBS crash detection:** Monitors OBS process, detects crashes
+4. **Smart recovery:** 
+   - Restarts OBS automatically (up to 3 times)
+   - Gives auto-reconnect time to restore device
+   - Stops only after threshold exceeded (requires user intervention)
+5. **Detailed logging:** Saves all crashes to `~/.cache/obs-safe-launch/obs-crash-*.log`
+
+### Configuration
+
+```bash
+# Find your device's VID:PID
+lsusb | grep -i "your-device-name"
+
+# Example for UGREEN 25173
+# ID 3188:1000 ITE UGREEN 25173
+
+# Create a permanent alias in ~/.bashrc for convenience
+echo "alias obs-ugreen='obs-safe --device /dev/v4l/by-id/usb-ITE_UGREEN_25173_00000001-video-index0 --vidpid 3188:1000'" >> ~/.bashrc
+source ~/.bashrc
+
+# Then simply use
+obs-ugreen
+```
+
+### Troubleshooting Persistent Crashes
+
+If USB device still causes repeated crashes:
+
+1. **Check device health:**
+   ```bash
+   sudo ./scripts/validate_capture.sh /dev/video0 3840x2160 10
+   ```
+
+2. **Monitor crash logs:**
+   ```bash
+   tail -50 ~/.cache/obs-safe-launch/obs-crash-*.log
+   ```
+
+3. **Check USB connection stability:**
+   ```bash
+   # Monitor device disconnect/reconnect events
+   sudo dmesg -w | grep -i "usb\|disconnect"
+   ```
+
+4. **Run device repair utility:**
+   ```bash
+   sudo ./scripts/maintenance.sh
+   # Select option 6: Repair (full USB reset + rebind)
+   ```
+
+5. **Check motherboard USB settings:**
+   - Enter BIOS and ensure USB port power is sufficient
+   - Try different USB ports (preferably USB 3.0+)
+   - Check for BIOS firmware updates
+   - Consider external powered USB hub if available
+
+### Alternative: Use v4l2loopback Isolation
+
+For maximum stability, use FFmpeg to feed v4l2loopback (decouples OBS from USB):
+
+```bash
+# Terminal 1: Start FFmpeg feed service
+sudo systemctl start usb-capture-ffmpeg.service
+
+# Terminal 2: Launch OBS reading from loopback, not USB directly
+obs-wayland
+# Then add source: Video Capture Device → /dev/video10 (USB_Capture_Loop)
+```
+
+This approach:
+- OBS reads stable v4l2loopback virtual device
+- FFmpeg reads USB hardware (can crash independently)
+- Auto-reconnect restarts FFmpeg, OBS continues unaffected
 
 ## Revert Changes
 

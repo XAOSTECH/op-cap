@@ -246,6 +246,35 @@ LAUNCHER_EOF
   sudo chmod +x "$OBS_LAUNCH_SCRIPT"
   success "Created $OBS_LAUNCH_SCRIPT launcher"
   info "You can now launch OBS with: obs-wayland"
+
+  # Also create the safe launcher if not already installed
+  create_safe_launcher
+}
+
+# Create safe launcher with USB device crash recovery
+create_safe_launcher() {
+  local SAFE_SCRIPT="/usr/local/bin/obs-safe"
+  info "Creating OBS Safe Launcher with USB device crash recovery..."
+
+  if [ ! -f "$BASEDIR/scripts/obs-safe-launch.sh" ]; then
+    warning "obs-safe-launch.sh not found in $BASEDIR/scripts/"
+    info "  To create it manually, check: https://github.com/XAOSTECH/op-cap/blob/main/scripts/obs-safe-launch.sh"
+    return 0
+  fi
+
+  sudo cp "$BASEDIR/scripts/obs-safe-launch.sh" "$SAFE_SCRIPT"
+  sudo chmod +x "$SAFE_SCRIPT"
+  success "Created $SAFE_SCRIPT launcher"
+  info ""
+  info "For USB capture device crash recovery, use:"
+  info "  obs-safe --device /dev/video0 --vidpid 3188:1000"
+  info ""
+  info "This launcher:"
+  info "  - Monitors USB device health"
+  info "  - Auto-restarts OBS if it crashes"
+  info "  - Runs auto-reconnect for device recovery"
+  info "  - Logs all issues to ~/.cache/obs-safe-launch/"
+  info ""
 }
 
 # Verify PipeWire is configured

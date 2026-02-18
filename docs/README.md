@@ -150,6 +150,8 @@ Most devices auto-handle HDR internally. Mode 2 provides fastest startup without
 
 ## OBS Setup
 
+### Standard Setup
+
 1. Add **Video Capture Device** source
 2. Select `/dev/video10` (labeled "USB_Capture_Loop")
 3. Resolution/FPS auto-detected
@@ -159,11 +161,34 @@ If device not visible:
 sudo modprobe -r v4l2loopback && sudo modprobe v4l2loopback video_nr=10 card_label="USB_Capture_Loop" exclusive_caps=1
 ```
 
+### For Unstable USB Devices (UGREEN, etc.)
+
+If your capture card frequently disconnects or crashes OBS, use the **safety launcher** with built-in crash recovery:
+
+```bash
+# Find your device VID:PID
+lsusb | grep -i "your-device"
+# Example: ID 3188:1000 ITE UGREEN 25173
+
+# Launch with safety features enabled
+make install-safe-launcher
+obs-safe --device /dev/video0 --vidpid 3188:1000
+```
+
+This launcher:
+- Monitors USB device health
+- Auto-restarts OBS if it crashes
+- Logs all issues to `~/.cache/obs-safe-launch/`
+- Prevents "double free or corruption" crashes
+
+See **[WAYLAND_OPTIMISATION.md](WAYLAND_OPTIMISATION.md#usb-capture-device-crash-recovery)** for detailed configuration and troubleshooting.
+
 ### Troubleshooting OBS Connection
 
 - **Loopback device not created:** See above modprobe command
 - **Device disconnects under load:** Run `sudo ./scripts/maintenance.sh` → select repair (option 6)
 - **Auto-reconnect not working:** Check `journalctl -u usb-capture-monitor.service -f` for errors
+- **OBS crashes with "double free or corruption":** Use `obs-safe` launcher or `make optimise-drivers`
 - **HW acceleration crashes on Wayland:** Run `make optimise-drivers` to fix GPU driver issues
 
 ## Troubleshooting
