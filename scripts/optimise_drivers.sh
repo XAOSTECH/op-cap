@@ -262,11 +262,69 @@ create_safe_launcher() {
     return 0
   fi
 
-  sudo cp "$BASEDIR/scripts/obs-safe-launch.sh" "$SAFE_SCRIPT"
+  # Create a wrapper script that calls the actual launcher with the correct project directory
+  sudo tee "$SAFE_SCRIPT" > /dev/null << 'WRAPPER_EOF'
+#!/usr/bin/env bash
+# OBS Safe Launcher Wrapper
+# Calls the actual obs-safe-launch.sh with the correct project directory
+# This wrapper is installed to /usr/local/bin for convenient access
+
+set -euo pipefail
+
+# Try to find the op-cap project directory
+# Priority: command-line arg > OBS_SAFE_BASEDIR env var > search in common locations > current dir
+BASEDIR=""
+
+# Check if --basedir is provided
+for arg in "$@"; do
+  if [[ "$arg" == "--basedir" ]]; then
+    BASEDIR="$2"
+    break
+  fi
+done
+
+# If not provided, check environment variable
+if [ -z "$BASEDIR" ] && [ -n "${OBS_SAFE_BASEDIR:-}" ]; then
+  BASEDIR="$OBS_SAFE_BASEDIR"
+elif [ -z "$BASEDIR" ]; then
+  # Try to find op-cap directory in common locations
+  for potential_dir in \
+    "/home/jnxlr/PRO/WEB/CST/op-cap" \
+    "$HOME/op-cap" \
+    "$HOME/projects/op-cap" \
+    "$HOME/src/op-cap" \
+    "/opt/op-cap" \
+    "$(pwd)"; do
+    if [ -f "$potential_dir/scripts/obs-safe-launch.sh" ]; then
+      BASEDIR="$potential_dir"
+      break
+    fi
+  done
+fi
+
+if [ -z "$BASEDIR" ] || [ ! -f "$BASEDIR/scripts/obs-safe-launch.sh" ]; then
+  echo "ERROR: Could not find op-cap project directory"
+  echo ""
+  echo "Usage: obs-safe --basedir /path/to/op-cap [--device /dev/video0] [--vidpid 3188:1000]"
+  echo ""
+  echo "Or set environment variable:"
+  echo "  export OBS_SAFE_BASEDIR=/path/to/op-cap"
+  echo "  obs-safe [--device /dev/video0] [--vidpid 3188:1000]"
+  exit 1
+fi
+
+# Call the actual launcher with the project directory
+exec "$BASEDIR/scripts/obs-safe-launch.sh" --basedir "$BASEDIR" "$@"
+WRAPPER_EOF
+
   sudo chmod +x "$SAFE_SCRIPT"
   success "Created $SAFE_SCRIPT launcher"
   info ""
   info "For USB capture device crash recovery, use:"
+  info "  obs-safe --device /dev/video0 --vidpid 3188:1000"
+  info ""
+  info "If auto-detection fails, set the project directory:"
+  info "  export OBS_SAFE_BASEDIR=/home/jnxlr/PRO/WEB/CST/op-cap"
   info "  obs-safe --device /dev/video0 --vidpid 3188:1000"
   info ""
   info "This launcher:"

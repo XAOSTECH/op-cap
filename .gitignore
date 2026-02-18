@@ -6,3 +6,4 @@
 # Use _example or _minimal variants as tracked references
 .devcontainer/Dockerfile
 .devcontainer/devcontainer.json
+driver

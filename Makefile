@@ -29,10 +29,17 @@ optimise-device:
 	sudo ./scripts/optimise_device.sh $(VIDPID)
 
 install-safe-launcher: build
-	sudo cp scripts/obs-safe-launch.sh /usr/local/bin/obs-safe
-	sudo chmod +x /usr/local/bin/obs-safe
-	@echo "✓ obs-safe launcher installed to /usr/local/bin/obs-safe"
-	@echo "Usage: obs-safe --device /dev/video0 --vidpid 3188:1000"
+	sudo cp scripts/obs-safe-launch.sh /usr/local/bin/obs-safe-launch
+	sudo chmod +x /usr/local/bin/obs-safe-launch
+	chmod +x scripts/extract_driver_info.sh || true
+	@echo "✓ obs-safe launcher installed to /usr/local/bin/obs-safe-launch"
+	@echo "✓ Usage: obs-safe --device /dev/video0 --vidpid 3188:1000"
+	@echo ""
+	@echo "Note: Use 'obs-safe' directly (wrapper created during driver optimization)"
+	@echo "      Or manually: obs-safe-launch --basedir /path/to/op-cap --device /dev/video0"
+
+extract-driver-info: 
+	@./scripts/extract_driver_info.sh
 
 uninstall:
 	@sudo ./scripts/uninstall.sh || true

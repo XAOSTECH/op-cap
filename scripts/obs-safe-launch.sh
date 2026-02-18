@@ -4,11 +4,13 @@
 # Integrates with auto-reconnect for v4l2 device recovery
 # Monitors OBS and restarts if it crashes due to capture device issues
 #
-# Usage: obs-safe-launch [--device /dev/video0] [--vidpid 3188:1000] [--obs-args "arg1 arg2"]
+# Usage: obs-safe-launch [--basedir /path/to/op-cap] [--device /dev/video0] [--vidpid 3188:1000] [--obs-args "arg1 arg2"]
 
 set -euo pipefail
 
-BASEDIR="$(cd "$(dirname "$0")/.." && pwd)"
+# Detect BASEDIR: can be overridden via --basedir, otherwise calculate from script location
+_SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+BASEDIR="${_SCRIPT_DIR}"  # Default: parent of scripts directory
 DEVICE=""
 VIDPID=""
 OBS_ARGS=""
@@ -53,6 +55,8 @@ log_recovery() {
 parse_args() {
   while (( "$#" )); do
     case "$1" in
+      --basedir)
+        BASEDIR="$2"; shift 2;;
       --device)
         DEVICE="$2"; shift 2;;
       --vidpid)
@@ -69,6 +73,7 @@ parse_args() {
 setup_logging() {
   mkdir -p "$LOG_DIR"
   log_info "OBS Safe Launch initialized"
+  log_info "Project directory: $BASEDIR"
   log_info "Log file: $LOG_FILE"
 }
 
@@ -156,6 +161,19 @@ stop_auto_reconnect() {
 pre_flight_checks() {
   log_info "Running pre-flight checks..."
 
+  # Verify BASEDIR exists
+  if [ ! -d "$BASEDIR" ]; then
+    log_error "Project directory not found: $BASEDIR"
+    log_error "Specify correct path with: --basedir /path/to/op-cap"
+    exit 1
+  fi
+
+  if [ ! -d "$BASEDIR/scripts" ]; then
+    log_error "Scripts directory not found: $BASEDIR/scripts"
+    log_error "BASEDIR seems incorrect: $BASEDIR"
+    exit 1
+  fi
+
   # Check for required commands
   for cmd in obs v4l2-ctl; do
     if ! command -v "$cmd" &>/dev/null; then
@@ -171,7 +189,7 @@ pre_flight_checks() {
       log_info "If connection issues persist, check:"
       log_info "  - lsusb (device enumerated?)"
       log_info "  - dmesg (driver errors?)"
-      log_info "  - sudo ./scripts/validate_capture.sh $DEVICE"
+      log_info "  - sudo $BASEDIR/scripts/validate_capture.sh $DEVICE"
     fi
   fi
 
@@ -215,8 +233,8 @@ monitor_obs() {
       log_error "OBS crashed $CRASH_COUNT times. Requiring user intervention."
       log_error "Common causes:"
       log_error "  - USB device disconnected (check journalctl -u usb-capture-ffmpeg.service)"
-      log_error "  - Buffer corruption (run: sudo ./scripts/validate_capture.sh $DEVICE)"
-      log_error "  - GPU driver issue (run: sudo make optimise-drivers)"
+      log_error "  - Buffer corruption (run: sudo $BASEDIR/scripts/validate_capture.sh $DEVICE)"
+      log_error "  - GPU driver issue (run: sudo make -C $BASEDIR optimise-drivers)"
       return 1
     fi
 
@@ -245,6 +263,7 @@ main() {
   setup_logging
 
   log_ok "=== OBS Safe Launch Wrapper ==="
+  log_info "PROJECT_DIR: $BASEDIR"
   log_info "DEVICE: ${DEVICE:-none}"
   log_info "VIDPID: ${VIDPID:-none}"
   log_info "OBS_ARGS: ${OBS_ARGS:-none}"
