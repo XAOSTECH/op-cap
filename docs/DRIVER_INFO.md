@@ -53,9 +53,12 @@ Based on the official driver configuration:
 ### Video Interfaces
 - **HDMI Input**: 1x HDMICapture device
 - **UVC Compliance**: Full UVC 1.0+ compliance
-- **Color Space**: YUV 4:2:0 (NV12, YU12)
+- **Color Spaces**: 
+  - YUV 4:2:0 (NV12, YU12) - Standard 8-bit
+  - **P010** (10-bit HDR) - Native 10-bit format support
 - **Max Resolution**: 4K UHD (3840x2160)
 - **Max Framerate**: Up to 60 fps (hardware dependent)
+- **HDR Support**: ✅ Full HDR10 / Rec.2100 PQ capable
 
 ### USB Controller
 - **Chip Vendor**: Etron (indicated by VID 3188)
@@ -70,12 +73,55 @@ Based on the official driver configuration:
 # Get detailed device info
 v4l2-ctl -d /dev/video0 --all
 
-# List pixel formats
+# List pixel formats (includes P010 if kernel patched)
 v4l2-ctl -d /dev/video0 --list-formats-ext
 
 # Check controls
 v4l2-ctl -d /dev/video0 --list-ctrls
+
+# Verify P010 support (if present, kernel is patched)
+v4l2-ctl -d /dev/video0 --list-formats-ext | grep -i p010
 ```
+
+### P010 HDR Format Support
+
+**Status**: ⚠️ Requires Linux kernel patch (v4l2 P010 support)
+
+The UGREEN 25173 natively supports P010 (10-bit YUV 4:2:0) for HDR capture, but standard Linux kernels do not expose this format via v4l2. A kernel patch is required:
+
+**Pre-patched OS Options:**
+- Raspberry Pi OS aarch64 with P010 support: https://github.com/awawa-dev/P010_for_V4L2/releases
+- Includes patched uvc driver for v4l2 P010 recognition
+
+**Manual Patching:**
+- Apply patches from: https://github.com/awawa-dev/P010_for_V4L2
+- Recompile kernel with P010 v4l2 support
+- See [P010 Kernel Patches](../../../P010_for_V4L2) (submodule at workspace root)
+
+#### P010 vs NV12 Quality Comparison
+
+| Aspect | NV12 (8-bit) | P010 (10-bit) |
+|--------|--------------|---------------|
+| Bit Depth | 8-bit | 10-bit |
+| Luminance Range | 16-144 (0-255 scale) | 64-576 (0-1023 scale) |
+| Detail Levels | 128 | 512 |
+| HDR Accuracy | ~2x loss when encoded | Native 4K detail |
+| Quantization Artifacts | Visible in dark scenes | Minimal |
+| File Size | Smaller | ~25% larger |
+| Encoder Conversion | NVENC 8→10-bit | Direct pass-through |
+| YouTube Stream | Acceptable HDR | Optimal HDR |
+
+#### Brightness Accuracy (Test Data)
+
+Source brightness: 200 nits (test reference)
+
+| Device | Output | Accuracy | Notes |
+|--------|--------|----------|-------|
+| **UGREEN 25173** | 205 nits | ✅ +2.5% | Best in class, minimal distortion |
+| Elgato HD60X | 251 nits | ⚠️ +25% | Whites inverted under 150% scaling |
+| Hagibis THB05 | 255 nits | ❌ +27.5% | Firmware bugs, unsupported |
+
+UGREEN is the **most accurate** USB HDR capture device tested.
 
 ### Recommended v4l2 Settings
 
@@ -167,17 +213,35 @@ Common UGREEN models with uvclower driver:
 | UGREEN 25173 | 3188:1000 | HDMI to USB 3.0, 4K@30Hz, HDR |
 | UGREEN 70403 | 3188:1000 | Same as 25173 |
 
+## P010 Kernel Patches & Resources
+
+### Credit: @awawa-dev (HyperHDR Project)
+
+The P010 v4l2 support patches and prebuilt kernels are maintained by Alexander Weissmann (@awawa-dev), creator of HyperHDR. His work includes:
+
+- **P010_for_V4L2**: Linux kernel patches for P010 UVC support
+- **HyperHDR**: Comprehensive HDR capture and processing software
+- **Testing & Validation**: Extensive device testing (UGREEN 25173, Elgato HD60X, Hagibis THB05)
+
+**Repository**: https://github.com/awawa-dev/P010_for_V4L2
+
+**Discussion (Full HDR Implementation Details)**: https://github.com/awawa-dev/HyperHDR/discussions/967
+
+---
+
 ## References
 
 - **UVC Specification**: https://www.usb.org/uvc
 - **Linux v4l2 Documentation**: https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/v4l2.html
 - **ffmpeg v4l2**: https://ffmpeg.org/ffmpeg-devices.html#video4linux2,-v4l2
 - **OBS on Linux**: https://obsproject.com/
+- **Linux Kernel - Media Subsystem**: https://www.kernel.org/doc/html/latest/media/index.html
 
 ## File Locations
 
 - **Driver Source**: [Build.0.15.12](https://www.mediafire.com/file/41l9pmpp2wqn6ks/25173+Build.0.15.12.zip/file)
-- **Linux Optimization** [WAYLAND_OPTIMISATION.md](WAYLAND_OPTIMISATION.md)
+- **P010 Kernel Patches**: [P010_for_V4L2 (workspace root)](../../../P010_for_V4L2)
+- **Linux Optimization**: [WAYLAND_OPTIMISATION.md](WAYLAND_OPTIMISATION.md)
 - **Buffer Troubleshooting**: [BUFFER_CORRUPTION.md](BUFFER_CORRUPTION.md)
 - **Safe Launcher**: [scripts/obs-safe-launch.sh](../scripts/obs-safe-launch.sh)
 
