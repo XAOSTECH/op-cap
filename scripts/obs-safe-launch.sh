@@ -111,40 +111,75 @@ check_usb_device() {
 # Check v4l2loopback is loaded
 # exclusive_caps=0: allows both writer (feed.sh) and readers (OBS) simultaneously
 # exclusive_caps=1 would block reading while writing - wrong for our use case
+## Scan /sys for any v4l2loopback virtual video device; prints /dev/videoN or empty
+_find_loopback_dev() {
+  local sysdev
+  for sysdev in /sys/devices/virtual/video4linux/video*; do
+    [ -d "$sysdev" ] || continue
+    local node="/dev/$(basename "$sysdev")"
+    [ -c "$node" ] || continue
+    # v4l2loopback devices appear as virtual; confirm via v4l2-ctl if available
+    if command -v v4l2-ctl &>/dev/null; then
+      if v4l2-ctl -d "$node" --info 2>/dev/null | grep -qi "loopback\|Dummy\|USB_Capture_Loop"; then
+        echo "$node"; return
+      fi
+    else
+      echo "$node"; return
+    fi
+  done
+}
+
 verify_v4l2loopback() {
   if lsmod | grep -q v4l2loopback; then
-    # Check if it was loaded with wrong params (exclusive_caps=1)
-    local excaps
-    excaps=$(cat /sys/module/v4l2loopback/parameters/exclusive_caps 2>/dev/null | cut -d, -f1)
-    if [ "$excaps" = "Y" ]; then
-      log_warn "v4l2loopback loaded with exclusive_caps=1 (blocks readers). Reloading..."
-      sudo modprobe -r v4l2loopback 2>/dev/null || true
-      sleep 1
-    else
-      if [ -c "$LOOPBACK_DEV" ]; then
-        log_ok "v4l2loopback available at $LOOPBACK_DEV"
-        return 0
+    # Module is loaded: find the actual device node (may not be at LOOPBACK_NR)
+    local found
+    found=$(_find_loopback_dev)
+
+    if [ -n "$found" ]; then
+      if [ "$found" != "$LOOPBACK_DEV" ]; then
+        log_warn "Loopback found at $found (expected $LOOPBACK_DEV) — updating"
+        LOOPBACK_DEV="$found"
       fi
+
+      # Warn if exclusive_caps=1 (blocks readers while feed.sh writes)
+      local excaps
+      excaps=$(cat /sys/module/v4l2loopback/parameters/exclusive_caps 2>/dev/null | cut -d, -f1)
+      if [ "$excaps" = "Y" ]; then
+        log_warn "exclusive_caps=1 detected — OBS may get VIDIOC_STREAMON errors. Reload with:"
+        log_warn "  sudo modprobe -r v4l2loopback && sudo modprobe v4l2loopback video_nr=$LOOPBACK_NR exclusive_caps=0 max_width=3840 max_height=2160"
+      fi
+
+      log_ok "v4l2loopback available at $LOOPBACK_DEV"
+      return 0
     fi
+
+    # Module loaded but no virtual video node found yet (race); wait briefly
+    log_warn "v4l2loopback is loaded but no virtual device node found"
+    return 1
   fi
 
+  # Module not loaded: attempt modprobe
   log_info "Loading v4l2loopback (exclusive_caps=0, video_nr=${LOOPBACK_NR})..."
   if ! sudo modprobe v4l2loopback \
       video_nr="$LOOPBACK_NR" \
       card_label="USB_Capture_Loop" \
       exclusive_caps=0 \
       max_width=3840 max_height=2160 2>&1; then
-    log_warn "Failed to load v4l2loopback (may not be installed)"
+    log_error "sudo modprobe failed. Load the module manually and re-run:"
+    log_error "  sudo modprobe v4l2loopback video_nr=$LOOPBACK_NR exclusive_caps=0 max_width=3840 max_height=2160"
     return 1
   fi
   sleep 2
 
-  if [ -c "$LOOPBACK_DEV" ]; then
-    log_ok "v4l2loopback available at $LOOPBACK_DEV"
+  local found
+  found=$(_find_loopback_dev)
+  if [ -n "$found" ]; then
+    LOOPBACK_DEV="$found"
+    log_ok "v4l2loopback loaded at $LOOPBACK_DEV"
     return 0
   fi
 
-  log_warn "v4l2loopback module loaded but $LOOPBACK_DEV not found"
+  log_error "v4l2loopback loaded but no device node appeared"
   return 1
 }
 
