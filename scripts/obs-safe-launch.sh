@@ -4,7 +4,7 @@
 # Integrates with auto-reconnect for v4l2 device recovery
 # Monitors OBS and restarts if it crashes due to capture device issues
 #
-# Usage: obs-safe-launch [--basedir /path/to/op-cap] [--device /dev/video0] [--vidpid 3188:1000] [--obs-args "arg1 arg2"]
+# Usage: obs-safe-launch [--basedir /path/to/op-cap] [--device /dev/video0] [--vidpid 3188:1000] [--no-loopback] [--obs-args "arg1 arg2"]
 
 set -euo pipefail
 
@@ -30,6 +30,7 @@ CAP_RES="${USB_CAPTURE_RES:-3840x2160}"
 CAP_FPS="${USB_CAPTURE_FPS:-30}"
 CAP_FMT="${USB_CAPTURE_FORMAT:-NV12}"
 HDR_MODE="${USB_CAPTURE_HDR_MODE:-2}"
+USE_LOOPBACK=1
 
 # Colors
 RED='\033[0;31m'
@@ -61,6 +62,26 @@ log_recovery() {
 }
 
 # Parse command-line arguments
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [options] [-- OBS_ARGS...]
+
+Options:
+  --basedir PATH         Path to op-cap project root
+  --device DEVNODE       Capture device node (e.g. /dev/video0)
+  --vidpid VID:PID       USB VID:PID for reset/rebind recovery
+  --obs-args "ARGS"      Extra arguments passed to OBS
+  --no-loopback          Skip v4l2loopback/feed.sh and launch OBS direct
+  --direct-device        Alias for --no-loopback
+  --help                 Show this help
+
+Examples:
+  $(basename "$0") --device /dev/usb-video-capture1
+  $(basename "$0") --device /dev/usb-video-capture1 --no-loopback
+  $(basename "$0") --device /dev/usb-video-capture1 --vidpid 1a2b:3344 --no-loopback
+EOF
+}
+
 parse_args() {
   while (( "$#" )); do
     case "$1" in
@@ -72,6 +93,16 @@ parse_args() {
         VIDPID="$2"; shift 2;;
       --obs-args)
         OBS_ARGS="$2"; shift 2;;
+      --no-loopback|--direct-device)
+        USE_LOOPBACK=0; shift;;
+      --help|-h)
+        usage; exit 0;;
+      --)
+        shift
+        if [ "$#" -gt 0 ]; then
+          OBS_ARGS="$OBS_ARGS $*"
+        fi
+        break;;
       *)
         OBS_ARGS="$OBS_ARGS $1"; shift;;
     esac
@@ -245,8 +276,8 @@ stop_feed() {
 
 # Start auto-reconnect monitor if device specified
 start_auto_reconnect() {
-  if [ -z "$DEVICE" ] || [ -z "$VIDPID" ]; then
-    log_info "Skipping auto-reconnect (no device/vidpid specified)"
+  if [ -z "$DEVICE" ]; then
+    log_info "Skipping auto-reconnect (no device specified)"
     return 0
   fi
 
@@ -255,7 +286,11 @@ start_auto_reconnect() {
     return 1
   fi
 
-  log_info "Starting auto-reconnect monitor for $DEVICE ($VIDPID)..."
+  if [ -z "$VIDPID" ]; then
+    log_warn "VIDPID not specified — auto-reconnect will watch device node only"
+  fi
+
+  log_info "Starting auto-reconnect monitor for $DEVICE (${VIDPID:-device-watch mode})..."
   # Run auto-reconnect in background
   sudo bash "$BASEDIR/scripts/auto_reconnect.sh" \
     --vidpid "$VIDPID" \
@@ -317,9 +352,11 @@ pre_flight_checks() {
     fi
   fi
 
-  # Verify v4l2loopback if using isolation
-  if [ -z "$DEVICE" ] || [ "$DEVICE" = "/dev/video10" ]; then
+  # Verify v4l2loopback if using isolation mode
+  if [ "$USE_LOOPBACK" -eq 1 ]; then
     verify_v4l2loopback || log_warn "v4l2loopback not available (no device isolation)"
+  else
+    log_info "Loopback mode disabled (--no-loopback): OBS will use capture device directly"
   fi
 
   log_ok "Pre-flight checks complete"
@@ -336,17 +373,9 @@ load_driver_optimizations() {
   fi
 }
 
-# Monitor OBS process and handle crashes
-monitor_obs() {
-  local obs_pid=$1
-
-  log_info "Monitoring OBS process (PID: $obs_pid)"
-
-  while kill -0 "$obs_pid" 2>/dev/null; do
-    sleep $MONITOR_INTERVAL
-  done
-
-  local exit_code=$?
+# Handle OBS exit and decide whether to recover/restart
+handle_obs_exit() {
+  local exit_code="$1"
   log_warn "OBS process exited with code: $exit_code"
 
   # Check if this was a crash (non-zero exit or signal)
@@ -367,7 +396,7 @@ monitor_obs() {
     sleep $RECOVERY_TIMEOUT
 
     # Restart auto-reconnect if it died
-    if [ -n "$DEVICE" ] && [ -n "$VIDPID" ]; then
+    if [ -n "$DEVICE" ]; then
       if ! kill -0 "$(cat "$PID_FILE" 2>/dev/null)" 2>/dev/null; then
         log_recovery "Auto-reconnect died, restarting..."
         start_auto_reconnect
@@ -390,6 +419,7 @@ main() {
   log_info "PROJECT_DIR: $BASEDIR"
   log_info "DEVICE: ${DEVICE:-none}"
   log_info "VIDPID: ${VIDPID:-none}"
+  log_info "MODE: $([ "$USE_LOOPBACK" -eq 1 ] && echo "loopback" || echo "direct-device")"
   log_info "OBS_ARGS: ${OBS_ARGS:-none}"
 
   pre_flight_checks
@@ -398,20 +428,27 @@ main() {
   # Set up cleanup trap early
   trap 'cleanup' EXIT INT TERM
 
-  # Step 1: load loopback
-  verify_v4l2loopback || { log_error "Cannot continue without v4l2loopback"; exit 1; }
+  if [ "$USE_LOOPBACK" -eq 1 ]; then
+    # Step 1: load loopback
+    verify_v4l2loopback || { log_error "Cannot continue without v4l2loopback"; exit 1; }
 
-  # Step 2: start feed.sh to bridge USB -> loopback, supervise it in background
-  start_feed
-  supervise_feed &
-  local supervisor_pid=$!
-  echo "$supervisor_pid" >> "$PID_FILE"
+    # Step 2: start feed.sh to bridge USB -> loopback, supervise it in background
+    start_feed
+    supervise_feed &
+    local supervisor_pid=$!
+    echo "$supervisor_pid" >> "$PID_FILE"
 
-  # Step 3: start auto-reconnect for USB device recovery
+    log_info "Launching OBS pointed at loopback: $LOOPBACK_DEV"
+    log_info "OBS should NOT be configured to open $DEVICE directly"
+  else
+    log_info "Skipping loopback/feed (--no-loopback)"
+    if [ -n "$DEVICE" ]; then
+      log_info "Configure OBS source to use device directly: $DEVICE"
+    fi
+  fi
+
+  # Step 3: start auto-reconnect monitor for USB device recovery
   start_auto_reconnect
-
-  log_info "Launching OBS pointed at loopback: $LOOPBACK_DEV"
-  log_info "OBS should NOT be configured to open $DEVICE directly"
   echo ""
 
   # Main loop: launch OBS, restart on crash
@@ -424,7 +461,7 @@ main() {
       break
     else
       EXIT_CODE=$?
-      if ! monitor_obs $$; then
+      if ! handle_obs_exit "$EXIT_CODE"; then
         break
       fi
     fi
