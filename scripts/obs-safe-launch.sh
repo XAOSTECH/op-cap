@@ -19,10 +19,12 @@ LOG_DIR="${HOME}/.cache/obs-safe-launch"
 LOG_FILE="$LOG_DIR/obs-crash-$(date +%Y%m%d_%H%M%S).log"
 PID_FILE="/tmp/obs-safe-launch-monitor.pid"
 FEED_PID_FILE="/tmp/obs-safe-launch-feed.pid"
+STREAM_STATE_FILE="/tmp/obs-safe-launch-streaming.state"
 MONITOR_INTERVAL=5
 RECOVERY_TIMEOUT=30
 CRASH_THRESHOLD=3  # Max consecutive crashes before requiring user intervention
 CRASH_COUNT=0
+WAS_STREAMING=0
 
 # Loopback config
 LOOPBACK_DEV="/dev/video10"
@@ -75,6 +77,7 @@ Options:
   --no-loopback          Skip v4l2loopback/feed.sh and launch OBS direct
   --direct-device        Alias for --no-loopback
   --no-device            Launch OBS without device requirement (configure sources manually)
+  --auto-stream          Auto-resume streaming after crash recovery
   --help                 Show this help
 
 Examples:
@@ -100,6 +103,8 @@ parse_args() {
         USE_LOOPBACK=0; shift;;
       --no-device)
         SKIP_DEVICE_CHECK=1; shift;;
+      --auto-stream)
+        OBS_ARGS="$OBS_ARGS --startstreaming"; shift;;
       --help|-h)
         usage; exit 0;;
       --)
@@ -385,9 +390,26 @@ load_driver_optimizations() {
   fi
 }
 
+# Check if OBS was streaming via websocket or log file
+detect_streaming_state() {
+  # Check recent log for streaming indicators
+  if tail -50 "$LOG_FILE" 2>/dev/null | grep -q "==== Streaming Start\|output 'adv_stream'.*started"; then
+    echo "1" > "$STREAM_STATE_FILE"
+    return 0
+  fi
+  return 1
+}
+
 # Handle OBS exit and decide whether to recover/restart
 handle_obs_exit() {
   local exit_code="$1"
+  
+  # Detect if OBS was streaming before crash
+  if detect_streaming_state; then
+    WAS_STREAMING=1
+    log_info "Detected OBS was streaming before crash"
+  fi
+  
   log_warn "OBS process exited with code: $exit_code"
 
   # Check if this was a crash (non-zero exit or signal)
@@ -412,6 +434,14 @@ handle_obs_exit() {
       if ! kill -0 "$(cat "$PID_FILE" 2>/dev/null)" 2>/dev/null; then
         log_recovery "Auto-reconnect died, restarting..."
         start_auto_reconnect
+      fi
+    fi
+    
+    # Add --startstreaming flag if OBS was streaming before crash
+    if [ "$WAS_STREAMING" -eq 1 ]; then
+      if [[ ! "$OBS_ARGS" =~ "--startstreaming" ]]; then
+        log_recovery "Auto-resuming stream after crash recovery"
+        OBS_ARGS="$OBS_ARGS --startstreaming"
       fi
     fi
 
@@ -492,7 +522,7 @@ cleanup() {
   log_info "Cleaning up..."
   stop_feed
   stop_auto_reconnect
-  rm -f "$PID_FILE"
+  rm -f "$PID_FILE" "$STREAM_STATE_FILE"
   log_info "Shutdown complete"
 }
 
