@@ -516,8 +516,10 @@ main() {
   while true; do
     export GSETTINGS_SCHEMA_DIR=/usr/share/glib-2.0/schemas
 
+    set +e  # Disable exit-on-error for OBS execution
     obs $OBS_ARGS 2>&1 | tee -a "$LOG_FILE"
     EXIT_CODE=${PIPESTATUS[0]}
+    set -e  # Re-enable exit-on-error
     
     log_info "OBS exited with code: $EXIT_CODE"
     
