@@ -25,6 +25,7 @@ RECOVERY_TIMEOUT=30
 CRASH_THRESHOLD=3  # Max consecutive crashes before requiring user intervention
 CRASH_COUNT=0
 WAS_STREAMING=0
+AUTO_RESUME_ENABLED=1  # Enable auto-resume by default
 
 # Loopback config
 LOOPBACK_DEV="/dev/video10"
@@ -77,7 +78,8 @@ Options:
   --no-loopback          Skip v4l2loopback/feed.sh and launch OBS direct
   --direct-device        Alias for --no-loopback
   --no-device            Launch OBS without device requirement (configure sources manually)
-  --auto-stream          Auto-resume streaming after crash recovery
+  --auto-resume          Enable automatic stream resumption after crash (default: enabled)
+  --no-auto-resume       Disable automatic stream resumption after crash
   --help                 Show this help
 
 Examples:
@@ -103,8 +105,10 @@ parse_args() {
         USE_LOOPBACK=0; shift;;
       --no-device)
         SKIP_DEVICE_CHECK=1; shift;;
-      --auto-stream)
-        OBS_ARGS="$OBS_ARGS --startstreaming"; shift;;
+      --auto-resume)
+        AUTO_RESUME_ENABLED=1; shift;;
+      --no-auto-resume)
+        AUTO_RESUME_ENABLED=0; shift;;
       --help|-h)
         usage; exit 0;;
       --)
@@ -437,8 +441,8 @@ handle_obs_exit() {
       fi
     fi
     
-    # Add --startstreaming flag if OBS was streaming before crash
-    if [ "$WAS_STREAMING" -eq 1 ]; then
+    # Add --startstreaming flag if OBS was streaming before crash and auto-resume is enabled
+    if [ "$AUTO_RESUME_ENABLED" -eq 1 ] && [ "$WAS_STREAMING" -eq 1 ]; then
       if [[ ! "$OBS_ARGS" =~ "--startstreaming" ]]; then
         log_recovery "Auto-resuming stream after crash recovery"
         OBS_ARGS="$OBS_ARGS --startstreaming"
