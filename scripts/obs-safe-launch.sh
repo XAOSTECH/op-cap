@@ -14,6 +14,7 @@ BASEDIR="${_SCRIPT_DIR}"  # Default: parent of scripts directory
 DEVICE=""
 VIDPID=""
 OBS_ARGS=""
+SKIP_DEVICE_CHECK=0
 LOG_DIR="${HOME}/.cache/obs-safe-launch"
 LOG_FILE="$LOG_DIR/obs-crash-$(date +%Y%m%d_%H%M%S).log"
 PID_FILE="/tmp/obs-safe-launch-monitor.pid"
@@ -73,12 +74,14 @@ Options:
   --obs-args "ARGS"      Extra arguments passed to OBS
   --no-loopback          Skip v4l2loopback/feed.sh and launch OBS direct
   --direct-device        Alias for --no-loopback
+  --no-device            Launch OBS without device requirement (configure sources manually)
   --help                 Show this help
 
 Examples:
   $(basename "$0") --device /dev/usb-video-capture1
   $(basename "$0") --device /dev/usb-video-capture1 --no-loopback
-  $(basename "$0") --device /dev/usb-video-capture1 --vidpid 1a2b:3344 --no-loopback
+  $(basename "$0") --no-device
+  $(basename "$0") --no-device --obs-args "--multiprofile"
 EOF
 }
 
@@ -95,6 +98,8 @@ parse_args() {
         OBS_ARGS="$2"; shift 2;;
       --no-loopback|--direct-device)
         USE_LOOPBACK=0; shift;;
+      --no-device)
+        SKIP_DEVICE_CHECK=1; shift;;
       --help|-h)
         usage; exit 0;;
       --)
@@ -342,14 +347,21 @@ pre_flight_checks() {
   done
 
   # Check if device specified and accessible
-  if [ -n "$DEVICE" ]; then
-    if ! check_usb_device "$DEVICE"; then
-      log_warn "USB device $DEVICE may be inaccessible. Continuing anyway..."
-      log_info "If connection issues persist, check:"
-      log_info "  - lsusb (device enumerated?)"
-      log_info "  - dmesg (driver errors?)"
-      log_info "  - sudo $BASEDIR/scripts/validate_capture.sh $DEVICE"
+  if [ "$SKIP_DEVICE_CHECK" -eq 0 ]; then
+    if [ -n "$DEVICE" ]; then
+      if ! check_usb_device "$DEVICE"; then
+        log_warn "USB device $DEVICE may be inaccessible. Continuing anyway..."
+        log_info "If connection issues persist, check:"
+        log_info "  - lsusb (device enumerated?)"
+        log_info "  - dmesg (driver errors?)"
+        log_info "  - sudo $BASEDIR/scripts/validate_capture.sh $DEVICE"
+        log_warn ""
+        log_warn "To launch OBS without a device and configure sources manually,"
+        log_warn "run with --no-device flag."
+      fi
     fi
+  else
+    log_info "Device checks skipped (--no-device flag). Configure sources manually in OBS."
   fi
 
   # Verify v4l2loopback if using isolation mode
@@ -420,6 +432,7 @@ main() {
   log_info "DEVICE: ${DEVICE:-none}"
   log_info "VIDPID: ${VIDPID:-none}"
   log_info "MODE: $([ "$USE_LOOPBACK" -eq 1 ] && echo "loopback" || echo "direct-device")"
+  log_info "DEVICE_CHECK: $([ "$SKIP_DEVICE_CHECK" -eq 1 ] && echo "disabled" || echo "enabled")"
   log_info "OBS_ARGS: ${OBS_ARGS:-none}"
 
   pre_flight_checks
@@ -447,8 +460,12 @@ main() {
     fi
   fi
 
-  # Step 3: start auto-reconnect monitor for USB device recovery
-  start_auto_reconnect
+  # Step 3: start auto-reconnect monitor for USB device recovery (only if device specified)
+  if [ "$SKIP_DEVICE_CHECK" -eq 0 ]; then
+    start_auto_reconnect
+  else
+    log_info "Device monitoring disabled (--no-device): OBS is protected from crash-restart loops only"
+  fi
   echo ""
 
   # Main loop: launch OBS, restart on crash
