@@ -413,27 +413,22 @@ detect_streaming_state() {
 
 # Handle OBS exit and decide whether to recover/restart
 handle_obs_exit() {
+  set +e  # Disable error exit for this function
   local exit_code="$1"
   
   # Detect if OBS was streaming before crash
-  if detect_streaming_state; then
-    WAS_STREAMING=1
-    log_info "Detected OBS was streaming before crash"
-  fi
+  detect_streaming_state && WAS_STREAMING=1
   
   log_warn "OBS process exited with code: $exit_code"
 
   # Check if this was a crash (non-zero exit or signal)
   if [ "$exit_code" -ne 0 ]; then
-    ((CRASH_COUNT++))
+    CRASH_COUNT=$((CRASH_COUNT + 1))
     log_info "CRASH_COUNT incremented to: $CRASH_COUNT"
 
     if [ $CRASH_COUNT -gt $CRASH_THRESHOLD ]; then
       log_error "OBS crashed $CRASH_COUNT times (threshold: $CRASH_THRESHOLD). Requiring user intervention."
-      log_error "Common causes:"
-      log_error "  - USB device disconnected (check journalctl -u usb-capture-ffmpeg.service)"
-      log_error "  - Buffer corruption (run: sudo $BASEDIR/scripts/validate_capture.sh $DEVICE)"
-      log_error "  - GPU driver issue (run: sudo make -C $BASEDIR optimise-drivers)"
+      set -e
       return 1
     fi
 
@@ -445,7 +440,7 @@ handle_obs_exit() {
     if [ -n "$DEVICE" ]; then
       if ! kill -0 "$(cat "$PID_FILE" 2>/dev/null)" 2>/dev/null; then
         log_recovery "Auto-reconnect died, restarting..."
-        start_auto_reconnect
+        start_auto_reconnect || log_recovery "Auto-reconnect restart failed"
       fi
     fi
     
@@ -458,13 +453,15 @@ handle_obs_exit() {
     fi
 
     log_recovery "Returning 0 (continue loop)"
+    set -e
     return 0
   else
     CRASH_COUNT=0
     log_info "Clean exit, resetting crash count"
+    set -e
     return 0
   fi
-}  
+}
 
 # Main launcher loop
 main() {
