@@ -22,8 +22,7 @@ FEED_PID_FILE="/tmp/obs-safe-launch-feed.pid"
 STREAM_STATE_FILE="/tmp/obs-safe-launch-streaming.state"
 MONITOR_INTERVAL=5
 RECOVERY_TIMEOUT=3
-CRASH_THRESHOLD=3  # Max consecutive crashes before requiring user intervention
-CRASH_COUNT=0
+CRASH_THRESHOLD="${OBS_SAFE_LAUNCH_CRASH_LIMIT:-0}"  # 0 = unlimited; non-zero applies per crash event only
 WAS_STREAMING=0
 AUTO_RESUME_ENABLED=1  # Enable auto-resume by default
 
@@ -415,6 +414,7 @@ detect_streaming_state() {
 handle_obs_exit() {
   set +e  # Disable error exit for this function
   local exit_code="$1"
+  local crash_attempt=1
   
   # Detect if OBS was streaming before crash
   detect_streaming_state && WAS_STREAMING=1
@@ -423,16 +423,17 @@ handle_obs_exit() {
 
   # Check if this was a crash (non-zero exit or signal)
   if [ "$exit_code" -ne 0 ]; then
-    CRASH_COUNT=$((CRASH_COUNT + 1))
-    log_info "CRASH_COUNT incremented to: $CRASH_COUNT"
-
-    if [ $CRASH_COUNT -gt $CRASH_THRESHOLD ]; then
-      log_error "OBS crashed $CRASH_COUNT times (threshold: $CRASH_THRESHOLD). Requiring user intervention."
+    if [ "$CRASH_THRESHOLD" -gt 0 ] && [ "$crash_attempt" -gt "$CRASH_THRESHOLD" ]; then
+      log_error "Crash recovery blocked by OBS_SAFE_LAUNCH_CRASH_LIMIT=$CRASH_THRESHOLD"
       set -e
       return 1
     fi
 
-    log_recovery "Attempting recovery (crash $CRASH_COUNT/$CRASH_THRESHOLD)"
+    if [ "$CRASH_THRESHOLD" -gt 0 ]; then
+      log_recovery "Attempting recovery (event attempt $crash_attempt/$CRASH_THRESHOLD)"
+    else
+      log_recovery "Attempting recovery (unlimited mode)"
+    fi
     log_recovery "Waiting ${RECOVERY_TIMEOUT}s before restart..."
     sleep $RECOVERY_TIMEOUT
 
@@ -456,8 +457,7 @@ handle_obs_exit() {
     set -e
     return 0
   else
-    CRASH_COUNT=0
-    log_info "Clean exit, resetting crash count"
+    log_info "Clean exit"
     set -e
     return 0
   fi
@@ -475,6 +475,12 @@ main() {
   log_info "MODE: $([ "$USE_LOOPBACK" -eq 1 ] && echo "loopback" || echo "direct-device")"
   log_info "DEVICE_CHECK: $([ "$SKIP_DEVICE_CHECK" -eq 1 ] && echo "disabled" || echo "enabled")"
   log_info "OBS_ARGS: ${OBS_ARGS:-none}"
+
+  if ! [[ "$CRASH_THRESHOLD" =~ ^[0-9]+$ ]]; then
+    log_warn "Invalid OBS_SAFE_LAUNCH_CRASH_LIMIT='$CRASH_THRESHOLD' (expected integer). Falling back to 0 (unlimited)."
+    CRASH_THRESHOLD=0
+  fi
+  log_info "CRASH_LIMIT: $CRASH_THRESHOLD (0=unlimited, per crash event)"
 
   pre_flight_checks
   load_driver_optimizations
@@ -522,7 +528,6 @@ main() {
     
     if [ $EXIT_CODE -eq 0 ]; then
       log_info "OBS exited normally"
-      CRASH_COUNT=0
       break
     else
       log_info "Calling handle_obs_exit with exit code: $EXIT_CODE"

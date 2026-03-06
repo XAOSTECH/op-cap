@@ -4,7 +4,7 @@ Stabilise high-throughput USB capture devices for OBS on Linux. Provides auto-re
 
 ## Features
 
-- **Automatic crash recovery** — OBS restarts automatically on USB device failure (3 retry limit)
+- **Automatic crash recovery** — OBS restarts automatically on USB device failure (unlimited by default)
 - **Stream resumption** — Monitors logs to detect active streams, auto-resumes if one was broadcasting
 - **v4l2loopback isolation** — FFmpeg feeds capture to `/dev/video10`, preventing OBS crashes from driver issues
 - **Auto-reconnect** — Monitors device and restarts feed on disconnect
@@ -187,11 +187,12 @@ lsusb | grep -i "your-device"
 
 **Safety launcher features:**
 - ✅ Monitors USB device health
-- ✅ Auto-restarts OBS on crash (max 3 attempts, 3s recovery timeout)
+- ✅ Auto-restarts OBS on crash (unlimited by default, 3s recovery timeout)
 - ✅ Detects if streaming was active before crash
 - ✅ Auto-resumes stream if it was broadcasting (enabled by default)
 - ✅ Captures full OBS output to log file for diagnostics
 - ✅ Logs to `~/.cache/obs-safe-launch/`
+- ✅ Optional per-crash limit via `OBS_SAFE_LAUNCH_CRASH_LIMIT` (`0` = unlimited)
 
 **Safety launcher flags:**
 | Flag | Purpose |
@@ -209,7 +210,7 @@ lsusb | grep -i "your-device"
 2. Wrapper waits 3 seconds for device/system to stabilize
 3. Checks OBS logs for active stream indication
 4. Restarts OBS with `--startstreaming` flag if stream was active
-5. If OBS crashes 3 times, requires human intervention
+5. Repeats this flow on future crashes (no cumulative cap unless `OBS_SAFE_LAUNCH_CRASH_LIMIT` is set)
 
 **Note:** Auto-reconnect requires sudo for USB hardware recovery (device resets, driver rebind). To avoid password prompts during long-running crash recovery, install the sudoers rule:
 ```bash
