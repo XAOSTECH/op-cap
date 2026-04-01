@@ -180,7 +180,7 @@ UDEVRULE
 sudo udevadm control --reload-rules || true
 sudo udevadm trigger || true
 
-# Run device optimization
+# Run device optimisation
 if [ -x "$BASEDIR/scripts/optimise_device.sh" ]; then
   echo "Running device optimizations..."
   sudo "$BASEDIR/scripts/optimise_device.sh" "$VIDPID" || true

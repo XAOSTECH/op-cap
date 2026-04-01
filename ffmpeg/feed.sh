@@ -16,8 +16,8 @@ FPS=${4:-${USB_CAPTURE_FPS:-30}}
 INPUT_FORMAT=${5:-${USB_CAPTURE_FORMAT:-NV12}}
 
 # HDR handling modes:
-#   0 = auto (trust device, no color interpretation)
-#   1 = force HDR interpretation (BT.2020/PQ) + tonemap to SDR (use if colors blown out)
+#   0 = auto (trust device, no colour interpretation)
+#   1 = force HDR interpretation (BT.2020/PQ) + tonemap to SDR (use if colours blown out)
 #   2 = force HDR interpretation (BT.2020/PQ) + passthrough NV12 - DEFAULT
 #   3 = force SDR interpretation (Rec.709)
 HDR_MODE=${USB_CAPTURE_HDR_MODE:-2}
@@ -107,7 +107,7 @@ if [ -n "$INPUT_PIX_FMT" ]; then
   INPUT_FMT_OPT="-input_format $INPUT_PIX_FMT"
 fi
 
-# HDR mode: set input color metadata and output pixel format
+# HDR mode: set input colour metadata and output pixel format
 HDR_INPUT_OPTS=""
 HDR_OUTPUT_OPTS=""
 HDR_FILTER=""
@@ -120,7 +120,7 @@ case "$HDR_MODE" in
     OUTPUT_PIX_FMT="yuv420p"
     ;;
   2)
-    # HDR passthrough: keep NV12, propagate color metadata to output
+    # HDR passthrough: keep NV12, propagate colour metadata to output
     # This is what allows OBS/downstream to classify the stream as HDR
     echo "  HDR Mode 2: BT.2020/PQ passthrough, NV12 preserved to loopback"
     HDR_INPUT_OPTS="-color_primaries bt2020 -color_trc smpte2084 -colorspace bt2020nc"
@@ -137,7 +137,7 @@ case "$HDR_MODE" in
     ;;
   *)
     # Mode 0: Auto
-    echo "  HDR Mode 0: Auto (trusting device color reporting, NV12 preserved)"
+    echo "  HDR Mode 0: Auto (trusting device colour reporting, NV12 preserved)"
     OUTPUT_PIX_FMT="nv12"
     ;;
 esac
@@ -178,7 +178,7 @@ elif [ -n "$FINAL_VF" ]; then
     -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" $HDR_OUTPUT_OPTS \
     -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
 else
-  # Clean passthrough: no filter, just relay with color metadata
+  # Clean passthrough: no filter, just relay with colour metadata
   LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
   ffmpeg -hide_banner -loglevel info \
     -thread_queue_size 16 -rtbufsize 256M \

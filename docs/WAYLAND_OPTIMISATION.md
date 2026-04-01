@@ -113,7 +113,7 @@ export PIPEWIRE_LATENCY=64/48000             # Optimise PipeWire audio
 
 #### AMD Configuration
 ```bash
-export RADEON_ENABLE_ACE=1                   # Enable color block compression
+export RADEON_ENABLE_ACE=1                   # Enable colour block compression
 export QT_QPA_PLATFORM=wayland
 export GDK_BACKEND=wayland
 export LIBVA_DRIVER_NAME=radeonsi            # VA-API hardware acceleration
@@ -306,8 +306,8 @@ export __NV_PM=0
 
 1. **Settings > Video:**
    - Renderer: GPU-based (OpenGL/Vulkan)
-   - Color Space: Native (recommended)
-   - Color Range: Full (when available)
+   - Colour Space: Native (recommended)
+   - Colour Range: Full (when available)
 
 2. **Settings > Advanced:**
    - Hardware Acceleration: Enable (checked)

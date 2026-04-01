@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Reset a USB device. Usage: sudo ./usb_reset.sh <bus> <devnum> or <device_path> or <VID:PID>
-# Also supports hub control: --disable-hub <bus> or --enable-hub <bus> or --authorize <bus>
+# Also supports hub control: --disable-hub <bus> or --enable-hub <bus> or --authorise <bus>
 MAINTENANCE_DESC="Reset USB device via ioctl or driver rebind"
 MAINTENANCE_ARGS="vidpid"
 
 set -euo pipefail
 
-# Authorize (enable) USB device that was kept unauthorized on boot
+# Authorise (enable) USB device that was kept unauthorized on boot
 function authorize_device() {
   local bus="$1"
   local sysdev="/sys/bus/usb/devices/$bus"
@@ -23,7 +23,7 @@ function authorize_device() {
     return 1
   fi
   
-  # Check current authorization state
+  # Check current authorisation state
   local auth
   auth=$(cat "$sysdev/authorized" 2>/dev/null || echo "unknown")
   
@@ -34,7 +34,7 @@ function authorize_device() {
   
   if [ "$auth" = "0" ]; then
     echo "Device $bus is currently unauthorized. Authorizing..."
-    # Write 1 to authorized to enable the device
+    # Write 1 to authorised to enable the device
     echo 1 | sudo tee "$sysdev/authorized" >/dev/null 2>&1 || {
       echo "Error: Could not write to $sysdev/authorized"
       echo "Try: echo 1 | sudo tee $sysdev/authorized"
@@ -53,7 +53,7 @@ function authorize_device() {
     pid=$(cat "$sysdev/idProduct" 2>/dev/null || echo "????")
     echo "Device initialized: $vid:$pid"
   else
-    echo "Warning: Could not verify device initialization"
+    echo "Warning: Could not verify device initialisation"
   fi
   
   return 0
@@ -132,7 +132,7 @@ if [ $# -eq 0 ]; then
   exit 2
 fi
 
-# Handle hub control and authorization options
+# Handle hub control and authorisation options
 if [[ "$1" =~ ^--(disable-hub|enable-hub|authorize)$ ]]; then
   if [ $# -lt 2 ]; then
     echo "Error: $1 requires a bus number"
@@ -149,7 +149,7 @@ if [[ "$1" =~ ^--(disable-hub|enable-hub|authorize)$ ]]; then
     --enable-hub)
       enable_hub "$bus"
       ;;
-    --authorize)
+    --authorise)
       authorize_device "$bus"
       ;;
   esac

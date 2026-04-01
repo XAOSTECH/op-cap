@@ -14,18 +14,18 @@ diverse, inclusive, and healthy community.
 
 ## Our Standards
 
-Examples of behavior that contributes to a positive environment for our
+Examples of behaviour that contributes to a positive environment for our
 community include:
 
 * Demonstrating empathy and kindness toward other people
 * Being respectful of differing opinions, viewpoints, and experiences
 * Giving and gracefully accepting constructive feedback
-* Accepting responsibility and apologizing to those affected by our mistakes,
+* Accepting responsibility and apologising to those affected by our mistakes,
   and learning from the experience
 * Focusing on what is best not just for us as individuals, but for the
   overall community
 
-Examples of unacceptable behavior include:
+Examples of unacceptable behaviour include:
 
 * The use of sexualized language or imagery, and sexual attention or
   advances of any kind
@@ -39,8 +39,8 @@ Examples of unacceptable behavior include:
 ## Enforcement Responsibilities
 
 Community leaders are responsible for clarifying and enforcing our standards of
-acceptable behavior and will take appropriate and fair corrective action in
-response to any behavior that they deem inappropriate, threatening, offensive,
+acceptable behaviour and will take appropriate and fair corrective action in
+response to any behaviour that they deem inappropriate, threatening, offensive,
 or harmful.
 
 Community leaders have the right and responsibility to remove, edit, or reject
@@ -58,7 +58,7 @@ representative at an online or offline event.
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be
+Instances of abusive, harassing, or otherwise unacceptable behaviour may be
 reported to the community leaders responsible for enforcement at
 .
 All complaints will be reviewed and investigated promptly and fairly.
@@ -73,12 +73,12 @@ the consequences for any action they deem in violation of this Code of Conduct:
 
 ### 1. Correction
 
-**Community Impact**: Use of inappropriate language or other behavior deemed
+**Community Impact**: Use of inappropriate language or other behaviour deemed
 unprofessional or unwelcome in the community.
 
 **Consequence**: A private, written warning from community leaders, providing
 clarity around the nature of the violation and an explanation of why the
-behavior was inappropriate. A public apology may be requested.
+behaviour was inappropriate. A public apology may be requested.
 
 ### 2. Warning
 
@@ -106,7 +106,7 @@ Violating these terms may lead to a permanent ban.
 ### 4. Permanent Ban
 
 **Community Impact**: Demonstrating a pattern of violation of community
-standards, including sustained inappropriate behavior,  harassment of an
+standards, including sustained inappropriate behaviour,  harassment of an
 individual, or aggression toward or disparagement of classes of individuals.
 
 **Consequence**: A permanent ban from any sort of public interaction within

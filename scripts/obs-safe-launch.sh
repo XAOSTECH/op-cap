@@ -40,7 +40,7 @@ STOP_REQUESTED=0
 SANDBOX_PROBED=0
 SANDBOX_SUPPORTED=0
 
-# Colors
+# Colours
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -173,7 +173,7 @@ setup_isolated_obs_config() {
 # Create log directory
 setup_logging() {
   mkdir -p "$LOG_DIR"
-  log_info "OBS Safe Launch initialized"
+  log_info "OBS Safe Launch initialised"
   log_info "Project directory: $BASEDIR"
   log_info "Log file: $LOG_FILE"
 }
@@ -430,14 +430,14 @@ pre_flight_checks() {
   log_ok "Pre-flight checks complete"
 }
 
-# Load GPU driver optimizations
+# Load GPU driver optimisations
 load_driver_optimizations() {
   if [ -f /etc/profile.d/obs-wayland.sh ]; then
-    log_info "Loading driver optimizations from /etc/profile.d/obs-wayland.sh"
+    log_info "Loading driver optimisations from /etc/profile.d/obs-wayland.sh"
     source /etc/profile.d/obs-wayland.sh
-    log_ok "Driver optimizations loaded"
+    log_ok "Driver optimisations loaded"
   else
-    log_warn "GPU driver optimizations not found. Run: sudo make optimise-drivers"
+    log_warn "GPU driver optimisations not found. Run: sudo make optimise-drivers"
   fi
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# toggle authorized on the usb device; test script only
+# toggle authorised on the usb device; test script only
 # Usage: sudo ./simulate_disconnect.sh VID:PID
-MAINTENANCE_DESC="Toggle device authorized state (test)"
+MAINTENANCE_DESC="Toggle device authorised state (test)"
 MAINTENANCE_ARGS="vidpid"
 
 set -euo pipefail

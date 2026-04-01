@@ -69,7 +69,7 @@ The Windows driver (uvclower.sys) is a UVC **lower filter** that adds vendor-spe
 **Platform Support:**
 - Windows x86 (32-bit): \`x86/uvclower.sys\`
 - Windows x64 (64-bit): \`x64/uvclower.sys\`
-- Catalog: \`uvclower.cat\`
+- Catalogue: \`uvclower.cat\`
 
 **Driver Functions:**
 - UVC filter for video capture
@@ -84,7 +84,7 @@ Based on the official driver configuration:
 ### Video Interfaces
 - **HDMI Input**: 1x HDMICapture device
 - **UVC Compliance**: Full UVC 1.0+ compliance
-- **Color Space**: YUV 4:2:0 (NV12, YU12)
+- **Colour Space**: YUV 4:2:0 (NV12, YU12)
 - **Max Resolution**: 4K UHD (3840x2160)
 - **Max Framerate**: Up to 60 fps (hardware dependent)
 
@@ -93,7 +93,7 @@ Based on the official driver configuration:
 - **USB Speed**: USB 3.0 / USB 3.1
 - **Interface Type**: USB Video Class (UVC)
 
-## Optimization for Linux
+## Optimisation for Linux
 
 ### v4l2-ctl Device Information
 
@@ -117,7 +117,7 @@ Based on the official driver specifications:
 Video Resolution: 3840x2160 (4K)
 Framerate: 30 fps (stable)
 Pixel Format: YU12 (Planar YUV 4:2:0)
-Color Space: Rec.709 / BT.709
+Colour Space: Rec.709 / BT.709
 
 # Alternative (lower resource)
 Video Resolution: 1920x1080 (Full HD)
@@ -148,7 +148,7 @@ The device is detected by:
    - Creates /dev/videoX nodes
 
 3. **v4l2 framework**:
-   - Provides standardized API
+   - Provides standardised API
    - Supports hardware acceleration (if available)
 
 ## Stability Tips for Linux
@@ -208,7 +208,7 @@ Common UGREEN models with uvclower driver:
 ## File Locations
 
 - **Driver Source**: \`driver/Build.0.15.12/Drivers/\`
-- **Linux Optimization** [WAYLAND_OPTIMISATION.md](WAYLAND_OPTIMISATION.md)
+- **Linux Optimisation** [WAYLAND_OPTIMISATION.md](WAYLAND_OPTIMISATION.md)
 - **Buffer Troubleshooting**: [BUFFER_CORRUPTION.md](BUFFER_CORRUPTION.md)
 - **Safe Launcher**: [scripts/obs-safe-launch.sh](../scripts/obs-safe-launch.sh)
 

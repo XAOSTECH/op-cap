@@ -14,15 +14,15 @@ Please check the type of change your PR introduces:
 - [ ] Documentation content changes
 - [ ] Other (please describe):
 
-## What is the current behavior?
+## What is the current behaviour?
 
-<!-- Please describe the current behavior that you are modifying, or link to a relevant issue. -->
+<!-- Please describe the current behaviour that you are modifying, or link to a relevant issue. -->
 
 Issue Number: N/A
 
-## What is the new behavior?
+## What is the new behaviour?
 
-<!-- Please describe the behavior or changes that are being added by this PR. -->
+<!-- Please describe the behaviour or changes that are being added by this PR. -->
 
 -
 -
