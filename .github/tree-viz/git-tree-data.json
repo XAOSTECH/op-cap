@@ -3,10 +3,21 @@
     "repository": "op-cap",
     "current_branch": "main",
     "repo_url": "https://github.com/XAOSTECH/op-cap",
-    "generated": "2026-04-06T02:06:45Z",
+    "generated": "2026-04-13T02:14:21Z",
     "max_commits": 500
   },
   "commits": [
+  {
+    "sha": "5c31064d41453bdef87356c7b7e622a173093efd",
+    "short": "5c31064",
+    "parents": "85cc669f1a6de5879ac15a25497d3375683a2828",
+    "author": "xaos-bot",
+    "email": "262248812+xaos-bot@users.noreply.github.com",
+    "date": "2026-04-06T02:06:45Z",
+    "timestamp": 1775441205,
+    "subject": "chore: update git tree visualisation",
+    "refs": "HEAD -> main, origin/main"
+  },
   {
     "sha": "85cc669f1a6de5879ac15a25497d3375683a2828",
     "short": "85cc669",
@@ -16,7 +27,7 @@
     "date": "2026-04-01T02:08:58Z",
     "timestamp": 1775009338,
     "subject": "Merge pull request #1 from XAOSTECH:anglicise/20260401-020828",
-    "refs": "HEAD -> main, origin/main"
+    "refs": ""
   },
   {
     "sha": "a825a385b61a6fefd6fd7da27ae9b21426b51d04",
@@ -27,7 +38,7 @@
     "date": "2026-04-01T02:08:28Z",
     "timestamp": 1775009308,
     "subject": "chore: convert American spellings to British English",
-    "refs": "origin/anglicise/20260401-020828"
+    "refs": ""
   },
   {
     "sha": "1ece3e53e26fa6a70712ae382f8166ae3d7d404f",
@@ -394,7 +405,7 @@
   }
 ],
   "branches": [
-  {"name":"85cc669f1a6de5879ac15a25497d3375683a2828 Merge pull request #1 from XAOSTECH:anglicise/20260401-020828","sha":"*","current":false,"merged":false}
+  {"name":"5c31064d41453bdef87356c7b7e622a173093efd chore: update git tree visualisation","sha":"*","current":false,"merged":false}
 ],
   "tags": [
   {"name":"latest","sha":"992386551bb737d39250fd95538bd616cc64c39e"},
