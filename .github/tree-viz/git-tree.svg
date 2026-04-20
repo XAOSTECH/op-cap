@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" 
      xmlns:xlink="http://www.w3.org/1999/xlink"
-     width="1200" height="1620" 
-     viewBox="0 0 1200 1620">
+     width="1200" height="1660" 
+     viewBox="0 0 1200 1660">
   <defs>
     <radialGradient id="leafGradient">
       <stop offset="0%" style="stop-color:#22c55e;stop-opacity:1" />
@@ -29,21 +29,21 @@
     </style>
   </defs>
   
-  <rect width="1200" height="1620" fill="#f8fafc"/>
+  <rect width="1200" height="1660" fill="#f8fafc"/>
   <defs>
     <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
       <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#e2e8f0" stroke-width="0.5" opacity="0.3"/>
     </pattern>
   </defs>
-  <rect width="1200" height="1620" fill="url(#grid)"/>
+  <rect width="1200" height="1660" fill="url(#grid)"/>
   
   <!-- Branch connection lines -->
   <g id="branches">
     <line class="trunk-line" x1="600" y1="60" x2="600" y2="100"/>
-    <line class="trunk-line" x1="600" y1="100" x2="600" y2="220"/>
-    <path class="branch-line" d="M 600 100 C 600 116, 720 124, 720 140"/>
-    <path class="branch-line" d="M 720 140 C 720 172, 600 188, 600 220"/>
-    <line class="trunk-line" x1="600" y1="220" x2="600" y2="260"/>
+    <line class="trunk-line" x1="600" y1="100" x2="600" y2="140"/>
+    <line class="trunk-line" x1="600" y1="140" x2="600" y2="260"/>
+    <path class="branch-line" d="M 600 140 C 600 156, 720 164, 720 180"/>
+    <path class="branch-line" d="M 720 180 C 720 212, 600 228, 600 260"/>
     <line class="trunk-line" x1="600" y1="260" x2="600" y2="300"/>
     <line class="trunk-line" x1="600" y1="300" x2="600" y2="340"/>
     <line class="trunk-line" x1="600" y1="340" x2="600" y2="380"/>
@@ -75,45 +75,47 @@
     <line class="trunk-line" x1="600" y1="1380" x2="600" y2="1420"/>
     <line class="trunk-line" x1="600" y1="1420" x2="600" y2="1460"/>
     <line class="trunk-line" x1="600" y1="1460" x2="600" y2="1500"/>
+    <line class="trunk-line" x1="600" y1="1500" x2="600" y2="1540"/>
   </g>
   <!-- Commit nodes -->
   <g id="commits">
-    <circle class="commit-leaf" cx="600" cy="60" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5c31064: chore: update git tree visualisation</title></circle>
-    <circle class="commit-leaf" cx="600" cy="100" r="10" fill="url(#mergeGradient)" stroke="#7c3aed" stroke-width="1.5"><title>85cc669: Merge pull request #1 from XAOSTECH:anglicise/20260401-020828</title></circle>
-    <circle class="commit-leaf" cx="720" cy="140" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>a825a38: chore: convert American spellings to British English</title></circle>
-    <circle class="commit-leaf" cx="600" cy="220" r="9" fill="url(#forkGradient)" stroke="#ea580c" stroke-width="1.5"><title>1ece3e5: chore: update CHANGELOG for v0.1.0 (re-release)</title></circle>
-    <circle class="commit-leaf" cx="600" cy="260" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>2eb8025: chore(dc-init): load workflows,actions</title></circle>
-    <circle class="commit-leaf" cx="600" cy="300" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>41d04d4: Improve --no-device isolation and preserve OBS settings</title></circle>
-    <circle class="commit-leaf" cx="600" cy="340" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>d54c781: chore(dc-init): update workflows,actions</title></circle>
-    <circle class="commit-leaf" cx="600" cy="380" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>53e140c: Harden --no-device mode with process-level isolation</title></circle>
-    <circle class="commit-leaf" cx="600" cy="420" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>b42b109: feat: add sobs/cobs host aliases and Makefile targets</title></circle>
-    <circle class="commit-leaf" cx="600" cy="460" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>b941e01: chore: update CHANGELOG for v0.1.0</title></circle>
-    <circle class="commit-leaf" cx="600" cy="500" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>3475fa6: chore(dc-init): update workflows and actions</title></circle>
-    <circle class="commit-leaf" cx="600" cy="540" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>8a1e113: Fix crash recovery limit logic: default unlimited, non-cumulative</title></circle>
-    <circle class="commit-leaf" cx="600" cy="580" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>0678f7c: fix(readme)</title></circle>
-    <circle class="commit-leaf" cx="600" cy="620" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>42f908b: Remove unnecessary sudo from kill in cleanup</title></circle>
-    <circle class="commit-leaf" cx="600" cy="660" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>e54b959: Add sudoers rule for passwordless crash recovery</title></circle>
-    <circle class="commit-leaf" cx="600" cy="700" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5d18e93: Fix: handle crash recovery with proper error handling</title></circle>
-    <circle class="commit-leaf" cx="600" cy="740" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>ae536f7: Update: document safety launcher with latest crash recovery features</title></circle>
-    <circle class="commit-leaf" cx="600" cy="780" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c3898ba: Fix: disable set -e for OBS execution to allow crash recovery</title></circle>
-    <circle class="commit-leaf" cx="600" cy="820" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5499462: Add explicit debug logging for crash recovery troubleshooting</title></circle>
-    <circle class="commit-leaf" cx="600" cy="860" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c10ea31: Fix recovery timeout and stream state detection</title></circle>
-    <circle class="commit-leaf" cx="600" cy="900" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>b2652d1: Fix auto-resume to only restart stream after crash, not on first launch</title></circle>
-    <circle class="commit-leaf" cx="600" cy="940" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>fc3b747: Add automatic stream resumption after crash recovery &gt; &gt; - Add --auto-stream flag to manually enable streaming on launch &gt; - Detect streaming state before crash by monitoring OBS logs &gt; - Auto-inject --startstreaming flag when restarting after crash &gt; - Preserve STREAM_STATE_FILE across crash recovery cycles &gt; - Resume streaming automatically if OBS was streaming before crash</title></circle>
-    <circle class="commit-leaf" cx="600" cy="980" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>2b5d980: obs-safe-launch: add --no-device for manual OBS config without device requirement</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1020" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>e70830c: obs-safe-launch: add direct-device mode without loopback</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1060" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>6669a02: feat(src): LD_PRELOAD shim to fix V4L2 loopback HDR colorspace</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1100" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c2df906: fix(obs-safe-launch): scan for loopback device instead of assuming video_nr</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1140" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>67b96ca: fix(feed.sh): preserve NV12 and propagate HDR metadata through loopback</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1180" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>1ddb2af: docs: add P010 HDR format support details and accuracy data</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1220" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>e1a5601: dc-init</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1260" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c3813fc: refactor: Simplify obs-safe wrapper and add USB stability guide</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1300" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>3467107: feat: Add official UGREEN driver documentation and fix obs-safe launcher paths</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1340" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>bddba2f: feat: Add OBS safe launcher with USB device crash recovery</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1380" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>1da6177: dc-contain</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1420" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>68e2512: feat: refactor maintenance system with centralised dispatcher and recovery tools</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1460" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>ff9c653: feat: add OBS Wayland GPU driver optimisation script</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1500" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>4958764: Init</title></circle>
+    <circle class="commit-leaf" cx="600" cy="60" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>ff9aa0b: chore: update git tree visualisation</title></circle>
+    <circle class="commit-leaf" cx="600" cy="100" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5c31064: chore: update git tree visualisation</title></circle>
+    <circle class="commit-leaf" cx="600" cy="140" r="10" fill="url(#mergeGradient)" stroke="#7c3aed" stroke-width="1.5"><title>85cc669: Merge pull request #1 from XAOSTECH:anglicise/20260401-020828</title></circle>
+    <circle class="commit-leaf" cx="720" cy="180" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>a825a38: chore: convert American spellings to British English</title></circle>
+    <circle class="commit-leaf" cx="600" cy="260" r="9" fill="url(#forkGradient)" stroke="#ea580c" stroke-width="1.5"><title>1ece3e5: chore: update CHANGELOG for v0.1.0 (re-release)</title></circle>
+    <circle class="commit-leaf" cx="600" cy="300" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>2eb8025: chore(dc-init): load workflows,actions</title></circle>
+    <circle class="commit-leaf" cx="600" cy="340" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>41d04d4: Improve --no-device isolation and preserve OBS settings</title></circle>
+    <circle class="commit-leaf" cx="600" cy="380" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>d54c781: chore(dc-init): update workflows,actions</title></circle>
+    <circle class="commit-leaf" cx="600" cy="420" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>53e140c: Harden --no-device mode with process-level isolation</title></circle>
+    <circle class="commit-leaf" cx="600" cy="460" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>b42b109: feat: add sobs/cobs host aliases and Makefile targets</title></circle>
+    <circle class="commit-leaf" cx="600" cy="500" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>b941e01: chore: update CHANGELOG for v0.1.0</title></circle>
+    <circle class="commit-leaf" cx="600" cy="540" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>3475fa6: chore(dc-init): update workflows and actions</title></circle>
+    <circle class="commit-leaf" cx="600" cy="580" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>8a1e113: Fix crash recovery limit logic: default unlimited, non-cumulative</title></circle>
+    <circle class="commit-leaf" cx="600" cy="620" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>0678f7c: fix(readme)</title></circle>
+    <circle class="commit-leaf" cx="600" cy="660" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>42f908b: Remove unnecessary sudo from kill in cleanup</title></circle>
+    <circle class="commit-leaf" cx="600" cy="700" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>e54b959: Add sudoers rule for passwordless crash recovery</title></circle>
+    <circle class="commit-leaf" cx="600" cy="740" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5d18e93: Fix: handle crash recovery with proper error handling</title></circle>
+    <circle class="commit-leaf" cx="600" cy="780" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>ae536f7: Update: document safety launcher with latest crash recovery features</title></circle>
+    <circle class="commit-leaf" cx="600" cy="820" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c3898ba: Fix: disable set -e for OBS execution to allow crash recovery</title></circle>
+    <circle class="commit-leaf" cx="600" cy="860" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5499462: Add explicit debug logging for crash recovery troubleshooting</title></circle>
+    <circle class="commit-leaf" cx="600" cy="900" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c10ea31: Fix recovery timeout and stream state detection</title></circle>
+    <circle class="commit-leaf" cx="600" cy="940" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>b2652d1: Fix auto-resume to only restart stream after crash, not on first launch</title></circle>
+    <circle class="commit-leaf" cx="600" cy="980" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>fc3b747: Add automatic stream resumption after crash recovery &gt; &gt; - Add --auto-stream flag to manually enable streaming on launch &gt; - Detect streaming state before crash by monitoring OBS logs &gt; - Auto-inject --startstreaming flag when restarting after crash &gt; - Preserve STREAM_STATE_FILE across crash recovery cycles &gt; - Resume streaming automatically if OBS was streaming before crash</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1020" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>2b5d980: obs-safe-launch: add --no-device for manual OBS config without device requirement</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1060" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>e70830c: obs-safe-launch: add direct-device mode without loopback</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1100" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>6669a02: feat(src): LD_PRELOAD shim to fix V4L2 loopback HDR colorspace</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1140" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c2df906: fix(obs-safe-launch): scan for loopback device instead of assuming video_nr</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1180" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>67b96ca: fix(feed.sh): preserve NV12 and propagate HDR metadata through loopback</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1220" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>1ddb2af: docs: add P010 HDR format support details and accuracy data</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1260" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>e1a5601: dc-init</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1300" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c3813fc: refactor: Simplify obs-safe wrapper and add USB stability guide</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1340" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>3467107: feat: Add official UGREEN driver documentation and fix obs-safe launcher paths</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1380" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>bddba2f: feat: Add OBS safe launcher with USB device crash recovery</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1420" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>1da6177: dc-contain</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1460" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>68e2512: feat: refactor maintenance system with centralised dispatcher and recovery tools</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1500" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>ff9c653: feat: add OBS Wayland GPU driver optimisation script</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1540" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>4958764: Init</title></circle>
   </g>
   
   <!-- Legend -->
@@ -130,12 +132,12 @@
   </g>
   
   <!-- Repository info -->
-  <g id="info" transform="translate(20, 1580)">
+  <g id="info" transform="translate(20, 1620)">
     <text x="0" y="0" class="branch-label" font-size="12" fill="#666">
       Repository: op-cap
     </text>
     <text x="0" y="20" class="branch-label" font-size="10" fill="#999">
-      Generated: 2026-04-13 02:14:21 UTC
+      Generated: 2026-04-20 02:14:35 UTC
     </text>
   </g>
 </svg>
