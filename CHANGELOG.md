@@ -1,4 +1,27 @@
 
+## [0.1.0] - 2026-09-14 (re-release)
+
+### Changed
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update CHANGELOG for v0.1.0 (re-release)
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update CHANGELOG for v0.1.0 (re-release)
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update git tree visualisation
+- chore: update CHANGELOG for v0.1.0 (re-release)
+- chore: update git tree visualisation
+
 ## [0.1.0] - 2026-07-20 (re-release)
 
 ### Changed
