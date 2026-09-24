@@ -1,19 +1,41 @@
 #!/usr/bin/env bash
 # Check for dependencies
 set -euo pipefail
-for cmd in gcc ffmpeg v4l2-ctl uvcdynctrl modprobe systemctl; do
-  if ! command -v $cmd >/dev/null 2>&1; then
-    echo "Missing command: $cmd"
+
+check_cmd() {
+  local cmd="$1" pkg="${2:-$1}"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "Missing: $cmd  → sudo apt install $pkg"
   else
-    echo "$cmd: OK"
+    echo "OK: $cmd"
   fi
-done
+}
+
+check_cmd gcc        build-essential
+check_cmd ffmpeg     ffmpeg
+check_cmd v4l2-ctl   v4l-utils
+check_cmd modprobe   kmod
+check_cmd systemctl  systemd
+check_cmd lsusb      usbutils
+
+# uvcdynctrl was removed from Ubuntu 22+; treat as optional
+if command -v uvcdynctrl >/dev/null 2>&1; then
+  echo "OK: uvcdynctrl (optional)"
+else
+  echo "OK (absent): uvcdynctrl is optional and no longer shipped on Ubuntu 22+"
+fi
 
 echo "Check kernel module: v4l2loopback"
 if lsmod | grep -q v4l2loopback; then
   echo "v4l2loopback loaded"
 else
-  echo "v4l2loopback not loaded"
+  KERNEL=$(uname -r)
+  echo "v4l2loopback not loaded (kernel: $KERNEL)"
+  if dpkg -l v4l2loopback-dkms &>/dev/null 2>&1; then
+    echo "  v4l2loopback-dkms installed; rebuild: sudo dkms install v4l2loopback -k $KERNEL"
+  else
+    echo "  Install: sudo apt install v4l2loopback-dkms linux-headers-$KERNEL"
+  fi
 fi
 
 echo "Check drivers for video devices:"

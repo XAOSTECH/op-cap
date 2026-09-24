@@ -18,6 +18,15 @@ shim-debug: $(SHIM_SRC)
 	gcc -shared -fPIC -O2 -DV4L2_HDR_SHIM_DEBUG -o $(SHIM_SO) $< -ldl
 	@echo "✓ v4l2-hdr-shim.so (debug) built at $(SHIM_SO)"
 
+deps:
+	@echo "Installing required packages for kernel $$(uname -r)..."
+	sudo apt-get install -y ffmpeg v4l-utils usbutils \
+	  v4l2loopback-dkms linux-headers-$$(uname -r) vainfo
+	@echo "Rebuilding v4l2loopback DKMS module for kernel $$(uname -r)..."
+	@V4L2LB_VER=$$(dpkg-query -W -f='$${Version}' v4l2loopback-dkms 2>/dev/null | sed 's/^[^:]*://;s/-.*//'); \
+	  [ -n "$$V4L2LB_VER" ] && sudo dkms install "v4l2loopback/$$V4L2LB_VER" -k "$$(uname -r)" 2>/dev/null || true
+	@echo "Done. Verify: sudo modprobe v4l2loopback && lsmod | grep v4l2loopback"
+
 install: build
 	sudo ./scripts/install.sh
 
