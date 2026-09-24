@@ -37,6 +37,7 @@ USE_LOOPBACK=1
 ISOLATED_CONFIG_DIR=""
 NO_V4L2_SHIM_DIR=""
 STOP_REQUESTED=0
+INTERRUPT_COUNT=0
 SANDBOX_PROBED=0
 SANDBOX_SUPPORTED=0
 
@@ -257,9 +258,34 @@ verify_v4l2loopback() {
       card_label="USB_Capture_Loop" \
       exclusive_caps=0 \
       max_width=3840 max_height=2160 2>&1; then
-    log_error "sudo modprobe failed. Load the module manually and re-run:"
-    log_error "  sudo modprobe v4l2loopback video_nr=$LOOPBACK_NR exclusive_caps=0 max_width=3840 max_height=2160"
-    return 1
+    local kernel_ver
+    kernel_ver=$(uname -r)
+    log_error "modprobe v4l2loopback failed (kernel: $kernel_ver)"
+    if dpkg -l v4l2loopback-dkms &>/dev/null 2>&1; then
+      local dkms_ver
+      dkms_ver=$(dpkg-query -W -f='${Version}' v4l2loopback-dkms 2>/dev/null | sed 's/^[^:]*://;s/-.*//')
+      if [ -n "$dkms_ver" ]; then
+        log_info "v4l2loopback-dkms ${dkms_ver} found; attempting DKMS build for kernel $kernel_ver..."
+        sudo dkms install "v4l2loopback/${dkms_ver}" -k "$kernel_ver" 2>&1 | tee -a "$LOG_FILE" || true
+        if ! sudo modprobe v4l2loopback video_nr="$LOOPBACK_NR" card_label="USB_Capture_Loop" \
+               exclusive_caps=0 max_width=3840 max_height=2160 2>&1; then
+          log_error "modprobe still failed after DKMS rebuild"
+          log_error "  Fix: sudo apt install linux-headers-${kernel_ver}"
+          log_error "  Then: sudo dkms install v4l2loopback/${dkms_ver} -k ${kernel_ver}"
+          return 1
+        fi
+        log_ok "v4l2loopback loaded after DKMS rebuild for kernel $kernel_ver"
+      else
+        log_error "v4l2loopback-dkms installed but cannot determine version"
+        log_error "  Fix: sudo apt install --reinstall v4l2loopback-dkms linux-headers-${kernel_ver}"
+        return 1
+      fi
+    else
+      log_error "v4l2loopback-dkms is not installed"
+      log_error "  Fix: sudo apt install v4l2loopback-dkms linux-headers-${kernel_ver}"
+      log_error "  Or run: make deps  (from the op-cap project root)"
+      return 1
+    fi
   fi
   sleep 2
 
@@ -397,7 +423,12 @@ pre_flight_checks() {
   # Check for required commands
   for cmd in obs v4l2-ctl; do
     if ! command -v "$cmd" &>/dev/null; then
-      log_error "$cmd not found. Install with: sudo apt install $cmd"
+      local pkg
+      case "$cmd" in
+        v4l2-ctl) pkg="v4l-utils" ;;
+        *) pkg="$cmd" ;;
+      esac
+      log_error "$cmd not found. Install with: sudo apt install $pkg"
       exit 1
     fi
   done
@@ -442,6 +473,7 @@ load_driver_optimizations() {
 }
 
 request_stop() {
+  INTERRUPT_COUNT=$((INTERRUPT_COUNT + 1))
   STOP_REQUESTED=1
 }
 
@@ -633,8 +665,17 @@ handle_obs_exit() {
   local crash_attempt=1
 
   if [ "$STOP_REQUESTED" -eq 1 ]; then
-    set -e
-    return 1
+    # A single Ctrl+C on a non-zero exit means the user killed a stuck OBS, not the wrapper.
+    # Clear the stop request so the recovery loop can restart OBS.
+    # Two or more interrupts (or SIGTERM) keeps the stop.
+    if [ "$exit_code" -ne 0 ] && [ "$INTERRUPT_COUNT" -le 1 ]; then
+      log_info "Single interrupt on crash exit — clearing stop flag, attempting recovery"
+      STOP_REQUESTED=0
+      INTERRUPT_COUNT=0
+    else
+      set -e
+      return 1
+    fi
   fi
   
   # Detect if OBS was streaming before crash
@@ -678,6 +719,12 @@ handle_obs_exit() {
         log_recovery "Auto-resuming stream after crash recovery"
         OBS_ARGS="$OBS_ARGS --startstreaming"
       fi
+    fi
+
+    # Add --safe-mode on crash recovery: mirrors OBS post-crash dialog; disables third-party plugins only
+    if [[ "$OBS_ARGS" != *"--safe-mode"* ]]; then
+      log_recovery "Adding --safe-mode for crash recovery restart"
+      OBS_ARGS="$OBS_ARGS --safe-mode"
     fi
 
     log_recovery "Returning 0 (continue loop)"
