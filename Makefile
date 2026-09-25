@@ -1,16 +1,26 @@
 SHIM_SRC  := src/v4l2-hdr-shim.c
 SHIM_SO   := src/v4l2-hdr-shim.so
+HIDE_SRC  := src/hide_v4l2.c
+HIDE_SO   := src/hide_v4l2.so
 
 all: build
 
-build: $(SHIM_SO)
+build: $(SHIM_SO) $(HIDE_SO)
+	@echo "Building usbreset..."
 	gcc scripts/usbreset.c -o scripts/usbreset || true
-	chmod +x scripts/*.sh || true
-	chmod +x ffmpeg/*.sh || true
+	@[ -f scripts/usbreset ] && echo "  ✓ scripts/usbreset" || echo "  ! usbreset skipped (gcc unavailable)"
+	chmod +x scripts/*.sh ffmpeg/*.sh || true
+	@echo "Build complete: $(SHIM_SO) $(HIDE_SO) scripts/usbreset"
 
 $(SHIM_SO): $(SHIM_SRC)
+	@echo "Building HDR format shim..."
 	gcc -shared -fPIC -O2 -o $@ $< -ldl
-	@echo "✓ v4l2-hdr-shim.so built at $@"
+	@echo "  ✓ $@ built"
+
+$(HIDE_SO): $(HIDE_SRC)
+	@echo "Building V4L2 device hide shim (--no-device / sobs)..."
+	gcc -shared -fPIC -O2 -o $@ $< -ldl
+	@echo "  ✓ $@ built"
 
 shim: $(SHIM_SO)
 
@@ -77,6 +87,6 @@ uninstall:
 	@sudo ./scripts/uninstall.sh || true
 
 clean:
-	rm -f scripts/usbreset $(SHIM_SO)
+	rm -f scripts/usbreset $(SHIM_SO) $(HIDE_SO)
 
 distclean: clean uninstall
