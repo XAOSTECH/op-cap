@@ -485,6 +485,12 @@ setup_no_v4l2_preload() {
       export LD_PRELOAD="$prebuilt"
     fi
     log_info "--no-device: V4L2 device hide shim active (pre-built)"
+    local obs_real
+    obs_real=$(readlink -f "$(command -v obs 2>/dev/null)" 2>/dev/null || true)
+    if [[ "$obs_real" == /snap/* ]]; then
+      log_warn "--no-device: OBS is snap-confined ($obs_real); LD_PRELOAD shim cannot reach inside the snap"
+      log_warn "--no-device: capture source errors in the OBS scene (e.g. v4l2-input ioctl) are expected and benign"
+    fi
     return 0
   fi
 
