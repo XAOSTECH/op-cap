@@ -746,10 +746,14 @@ main() {
   trap 'cleanup' EXIT
 
   if [ "$USE_LOOPBACK" -eq 1 ]; then
-    # Step 1: load loopback
-    verify_v4l2loopback || { log_error "Cannot continue without v4l2loopback"; exit 1; }
+    if ! verify_v4l2loopback; then
+      log_warn "v4l2loopback unavailable — falling back to direct device mode (run: make deps to install)"
+      USE_LOOPBACK=0
+    fi
+  fi
 
-    # Step 2: start feed.sh to bridge USB -> loopback, supervise it in background
+  if [ "$USE_LOOPBACK" -eq 1 ]; then
+    # start feed.sh to bridge USB -> loopback, supervise it in background
     start_feed
     supervise_feed &
     local supervisor_pid=$!
