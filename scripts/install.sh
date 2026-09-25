@@ -36,7 +36,7 @@ if command -v modprobe >/dev/null 2>&1; then
   if lsmod | grep -q v4l2loopback; then
     echo "v4l2loopback module loaded"
   else
-    echo "v4l2loopback module not loaded — please install v4l2loopback-dkms if you want loopback outputs"
+    echo "v4l2loopback module not loaded — run: make deps  (from the op-cap root) to install it"
   fi
 fi
 if [ ${#MISSING[@]} -ne 0 ]; then
