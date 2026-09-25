@@ -38,6 +38,7 @@ deps:
 	@echo "Done. Verify: sudo modprobe v4l2loopback && lsmod | grep v4l2loopback"
 
 install: build
+	@modprobe -n v4l2loopback 2>/dev/null || { echo "v4l2loopback module missing for kernel $$(uname -r) — running make deps first..."; $(MAKE) deps; }
 	sudo ./scripts/install.sh
 
 optimise-drivers:
