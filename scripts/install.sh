@@ -46,9 +46,17 @@ fi
 
 # Interactive selection: detect /dev/video* and ask the user which to use
 echo "Detecting available video devices..."
-mapfile -t VIDEO_DEVICES < <(ls -1 /dev/video* 2>/dev/null || true)
+mapfile -t VIDEO_DEVICES < <(
+  for _d in /dev/video*; do
+    [ -c "$_d" ] || continue
+    if command -v v4l2-ctl >/dev/null 2>&1; then
+      v4l2-ctl -d "$_d" --info 2>/dev/null | grep -qi "Video Capture" || continue
+    fi
+    echo "$_d"
+  done
+)
 if [ ${#VIDEO_DEVICES[@]} -eq 0 ]; then
-  echo "No video devices found. Please plug in your capture device and try again."
+  echo "No video capture devices found. Plug in your capture device and re-run."
   exit 1
 fi
 if [ ${#VIDEO_DEVICES[@]} -eq 1 ]; then
