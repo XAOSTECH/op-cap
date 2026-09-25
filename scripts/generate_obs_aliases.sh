@@ -93,9 +93,14 @@ if [[ ! -f "\$LAUNCHER" ]]; then
   exit 1
 fi
 
-mapfile -t VIDEO_DEVICES < <(ls -1 /dev/video* 2>/dev/null || true)
+mapfile -t VIDEO_DEVICES < <(
+  for _d in /dev/video*; do
+    [[ -c "\$_d" ]] || continue
+    v4l2-ctl -d "\$_d" --info 2>/dev/null | grep -qi "Video Capture" && echo "\$_d"
+  done
+)
 if [[ \${#VIDEO_DEVICES[@]} -eq 0 ]]; then
-  echo "No /dev/video* devices found." >&2
+  echo "No video capture devices found (metadata-only nodes excluded)." >&2
   exit 1
 fi
 

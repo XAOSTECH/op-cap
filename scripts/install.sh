@@ -23,7 +23,7 @@ done
 
 # Suggest installing helpful utilities
 echo "Checking optional utilities: 'slop' for delogo pick and 'uhubctl' for hub power control"
-for opt in slop uhubctl uvcdynctrl; do
+for opt in slop uhubctl; do
   if ! command -v $opt >/dev/null 2>&1; then
     echo "Optional: $opt not installed. Install if you want $opt-related features."
   fi
