@@ -50,7 +50,7 @@ mapfile -t VIDEO_DEVICES < <(
   for _d in /dev/video*; do
     [ -c "$_d" ] || continue
     if command -v v4l2-ctl >/dev/null 2>&1; then
-      v4l2-ctl -d "$_d" --info 2>/dev/null | grep -qi "Video Capture" || continue
+      v4l2-ctl -d "$_d" --list-formats 2>/dev/null | grep -q '\[0\]' || continue
     fi
     echo "$_d"
   done
@@ -123,6 +123,37 @@ if [ -d /dev/v4l/by-path ] && [ "$PERSISTENT_PATH" == "$CHOSEN" ]; then
 fi
 
 echo "Chosen persistent path: $PERSISTENT_PATH"
+
+# Patch any v4l2_input sources in OBS scene collections to the selected device.
+# Runs as the real user when invoked via sudo so the right config dir is found.
+REAL_HOME="${HOME}"
+[ -n "${SUDO_USER:-}" ] && REAL_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+OBS_SCENES="$REAL_HOME/.config/obs-studio/basic/scenes"
+if [ -d "$OBS_SCENES" ]; then
+  if pgrep -x obs >/dev/null 2>&1; then
+    echo "OBS is running — close it first for scene device path to be updated"
+  else
+    python3 - "$PERSISTENT_PATH" "$OBS_SCENES" <<'PYEOF'
+import sys, json, glob, os
+device, sdir = sys.argv[1], sys.argv[2]
+n = 0
+for fp in glob.glob(os.path.join(sdir, "*.json")):
+    try:
+        with open(fp) as f: data = json.load(f)
+        changed = False
+        for src in data.get("sources", []):
+            if src.get("id") == "v4l2_input":
+                s = src.setdefault("settings", {})
+                if s.get("device_id", "").startswith("/dev/"):
+                    s["device_id"] = device; changed = True; n += 1
+        if changed:
+            with open(fp, "w") as f: json.dump(data, f, indent=4)
+    except Exception as e:
+        print(f"  warning: {fp}: {e}")
+print(f"  Updated {n} v4l2_input source(s) to {device}" if n else "  No v4l2_input sources found — configure Capcard device in OBS manually")
+PYEOF
+  fi
+fi
 
 # Optional: configure overlay
 OVERLAY_URL=""

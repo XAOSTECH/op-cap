@@ -96,7 +96,7 @@ fi
 mapfile -t VIDEO_DEVICES < <(
   for _d in /dev/video*; do
     [[ -c "\$_d" ]] || continue
-    v4l2-ctl -d "\$_d" --info 2>/dev/null | grep -qi "Video Capture" && echo "\$_d"
+    v4l2-ctl -d "\$_d" --list-formats 2>/dev/null | grep -q '\[0\]' && echo "\$_d"
   done
 )
 if [[ \${#VIDEO_DEVICES[@]} -eq 0 ]]; then
