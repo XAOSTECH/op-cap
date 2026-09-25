@@ -131,45 +131,8 @@ parse_args() {
   done
 }
 
-# In --no-device mode, launch OBS with a clean config path so old scenes
-# containing unstable capture sources are not auto-loaded.
-setup_isolated_obs_config() {
-  if [ "$SKIP_DEVICE_CHECK" -ne 1 ]; then
-    return 0
-  fi
-
-  local original_xdg_config
-  local original_obs_config
-  local isolated_obs_config
-
-  original_xdg_config="${XDG_CONFIG_HOME:-$HOME/.config}"
-  original_obs_config="$original_xdg_config/obs-studio"
-
-  ISOLATED_CONFIG_DIR=$(mktemp -d /tmp/obs-safe-launch-config.XXXXXX)
-  isolated_obs_config="$ISOLATED_CONFIG_DIR/obs-studio"
-
-  mkdir -p "$isolated_obs_config/basic" "$isolated_obs_config/basic/scenes"
-
-  # Keep profile/settings convenience in --no-device mode while deliberately
-  # dropping scene collections (where capture sources are defined).
-  if [ -f "$original_obs_config/global.ini" ]; then
-    cp -f "$original_obs_config/global.ini" "$isolated_obs_config/global.ini" || true
-  fi
-
-  if [ -d "$original_obs_config/basic/profiles" ]; then
-    cp -a "$original_obs_config/basic/profiles" "$isolated_obs_config/basic/" || true
-  fi
-
-  if [ -d "$original_obs_config/plugin_config" ]; then
-    cp -a "$original_obs_config/plugin_config" "$isolated_obs_config/" || true
-  fi
-
-  export XDG_CONFIG_HOME="$ISOLATED_CONFIG_DIR"
-
-  log_info "--no-device enabled: forcing no-loopback and scene-isolated OBS config"
-  log_info "Profiles/settings copied; scene collections intentionally not copied"
-  log_info "Isolated config dir: $ISOLATED_CONFIG_DIR"
-}
+# Device hiding is handled entirely by the LD_PRELOAD shim in setup_no_v4l2_preload; OBS config is left intact.
+setup_isolated_obs_config() { return 0; }
 
 # Create log directory
 setup_logging() {
@@ -513,8 +476,20 @@ setup_no_v4l2_preload() {
     return 0
   fi
 
+  # Prefer the pre-built shim from make build; avoids snap-confined gcc at runtime
+  local prebuilt="$BASEDIR/src/hide_v4l2.so"
+  if [ -f "$prebuilt" ]; then
+    if [ -n "${LD_PRELOAD:-}" ]; then
+      export LD_PRELOAD="$prebuilt:$LD_PRELOAD"
+    else
+      export LD_PRELOAD="$prebuilt"
+    fi
+    log_info "--no-device: V4L2 device hide shim active (pre-built)"
+    return 0
+  fi
+
   if ! command -v gcc >/dev/null 2>&1; then
-    log_warn "--no-device: gcc not found; cannot build V4L2 obfuscation shim"
+    log_warn "--no-device: pre-built shim not found and gcc unavailable; run: make build"
     return 0
   fi
 
@@ -721,10 +696,10 @@ handle_obs_exit() {
       fi
     fi
 
-    # Add --safe-mode on crash recovery: mirrors OBS post-crash dialog; disables third-party plugins only
+    # --safe-mode mirrors the OBS post-crash dialog; --disable-missing-files-check prevents blocking dialogs
     if [[ "$OBS_ARGS" != *"--safe-mode"* ]]; then
-      log_recovery "Adding --safe-mode for crash recovery restart"
-      OBS_ARGS="$OBS_ARGS --safe-mode"
+      log_recovery "Adding --safe-mode --disable-missing-files-check for crash recovery restart"
+      OBS_ARGS="$OBS_ARGS --safe-mode --disable-missing-files-check"
     fi
 
     log_recovery "Returning 0 (continue loop)"
@@ -758,7 +733,6 @@ main() {
 
   pre_flight_checks
   load_driver_optimizations
-  setup_isolated_obs_config
   setup_no_v4l2_preload
 
   # Set up cleanup trap early
