@@ -366,15 +366,14 @@ start_auto_reconnect() {
   log_ok "Auto-reconnect monitor started (PID: $(cat "$PID_FILE"))"
 }
 
-# Stop auto-reconnect monitor
+# Stop auto-reconnect monitor and any feed supervisor recorded in PID_FILE
 stop_auto_reconnect() {
   if [ -f "$PID_FILE" ]; then
-    local PID=$(cat "$PID_FILE")
-    if kill -0 "$PID" 2>/dev/null; then
-      log_info "Stopping auto-reconnect monitor (PID: $PID)"
-      kill "$PID" 2>/dev/null || true
-      sleep 2
-    fi
+    while IFS= read -r pid; do
+      [ -n "$pid" ] || continue
+      kill -0 "$pid" 2>/dev/null && kill "$pid" 2>/dev/null || true
+    done < "$PID_FILE"
+    sleep 1
     rm -f "$PID_FILE"
   fi
 }
@@ -762,11 +761,13 @@ main() {
   fi
 
   if [ "$USE_LOOPBACK" -eq 1 ]; then
-    # start feed.sh to bridge USB -> loopback, supervise it in background
     start_feed
-    supervise_feed &
-    local supervisor_pid=$!
-    echo "$supervisor_pid" >> "$PID_FILE"
+    # Only supervise if we started our own feed; service-managed feeds need no watchdog
+    if [ -f "$FEED_PID_FILE" ]; then
+      supervise_feed &
+      local supervisor_pid=$!
+      echo "$supervisor_pid" >> "$PID_FILE"
+    fi
 
     log_info "Launching OBS pointed at loopback: $LOOPBACK_DEV"
     log_info "OBS should NOT be configured to open $DEVICE directly"
