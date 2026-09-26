@@ -144,6 +144,21 @@ esac
 
 echo "Starting FFmpeg: $IN -> $OUT at ${VID_SIZE}@${FPS}fps (format: ${INPUT_FORMAT}, out: ${OUTPUT_PIX_FMT})"
 
+# MJPG: copy compressed frames directly to the loopback without decoding.
+# v4l2loopback then presents native MJPG to OBS (same format/framerate as the
+# physical device), eliminating the redundant decode → NV12 → re-encode cycle
+# and the emulated-format cycling OBS exhibits when reading decoded raw data.
+if [ "$INPUT_FORMAT" = "MJPG" ] && [ -z "$FILTERS" ] && [ -z "$OVERLAY_FILE" ]; then
+  echo "  Mode: MJPG pass-through (native compressed stream, OBS decodes directly)"
+  ffmpeg -hide_banner -loglevel info \
+    -thread_queue_size 16 -rtbufsize 256M \
+    -f v4l2 -input_format mjpeg -framerate "$FPS" -video_size "$VID_SIZE" -i "$IN" \
+    -vcodec copy \
+    -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
+  exit 0
+fi
+
+# Decode pipeline (NV12 / YU12 / YUYV input, or MJPG with filters/overlay)
 # Build filter string
 FINAL_VF=""
 if [ -n "$HDR_FILTER" ] && [ -n "$FILTERS" ]; then
