@@ -280,9 +280,6 @@ start_feed() {
   # Reuse the systemd feed if it is already bridging the device to the loopback
   if systemctl is-active --quiet usb-capture-ffmpeg.service 2>/dev/null; then
     log_info "Loopback feed already active via usb-capture-ffmpeg.service — skipping feed.sh"
-    # Lock discrete framerate so OBS sees 60fps not the stepwise 0-1000fps default
-    command -v v4l2loopback-ctl >/dev/null 2>&1 && \
-      v4l2loopback-ctl set-fps "$CAP_FPS" "$LOOPBACK_DEV" 2>/dev/null || true
     return 0
   fi
 
@@ -307,9 +304,6 @@ start_feed() {
     log_error "feed.sh died — check if $DEVICE is held by another process: fuser $DEVICE"
     return 1
   fi
-  # Lock discrete framerate so OBS sees the actual rate not the stepwise 0-1000fps default
-  command -v v4l2loopback-ctl >/dev/null 2>&1 && \
-    v4l2loopback-ctl set-fps "$CAP_FPS" "$LOOPBACK_DEV" 2>/dev/null || true
 }
 
 # Watchdog: restart feed.sh if it dies, without restarting OBS
