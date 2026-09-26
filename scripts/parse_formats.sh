@@ -54,8 +54,8 @@ while IFS= read -r line; do
     height=${current_res#*x}
     pixels=$((width * height))
     
-    # Prefer NV12/YU12 for 4K (YUYV bandwidth limited)
-    if [[ "$current_format" =~ ^(NV12|YU12|YUYV)$ ]]; then
+    # Prefer NV12/YU12/YUYV for 4K uncompressed; include MJPG so 4K@60fps is reachable
+    if [[ "$current_format" =~ ^(NV12|YU12|YUYV|MJPG)$ ]]; then
       if [ "$current_res" == "3840x2160" ] && [ "$fps_int" -ge 25 ]; then
         if [ -z "$BEST_RES" ] || [ "$fps_int" -gt "$BEST_FPS" ] || [ "$BEST_RES" != "3840x2160" ]; then
           BEST_RES="$current_res"
