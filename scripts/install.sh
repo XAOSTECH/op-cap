@@ -118,7 +118,15 @@ echo "Chosen persistent path: $PERSISTENT_PATH"
 # Patch any v4l2_input sources in OBS scene collections to the selected device.
 # Runs as the real user when invoked via sudo so the right config dir is found.
 REAL_HOME="${HOME}"
-[ -n "${SUDO_USER:-}" ] && REAL_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+# Under double-sudo (sudo make install → sudo install.sh) SUDO_USER becomes root;
+# fall back to logname which always returns the terminal owner
+_ORIG_USER="${SUDO_USER:-}"
+if [ -z "$_ORIG_USER" ] || [ "$_ORIG_USER" = "root" ]; then
+  _ORIG_USER=$(logname 2>/dev/null || who am i 2>/dev/null | awk '{print $1}' || true)
+fi
+if [ -n "$_ORIG_USER" ] && [ "$_ORIG_USER" != "root" ]; then
+  REAL_HOME=$(getent passwd "$_ORIG_USER" | cut -d: -f6)
+fi
 OBS_SCENES="$REAL_HOME/.config/obs-studio/basic/scenes"
 if [ -d "$OBS_SCENES" ]; then
   if pgrep -x obs >/dev/null 2>&1; then
