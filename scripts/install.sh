@@ -124,7 +124,10 @@ if [ -d "$OBS_SCENES" ]; then
   if pgrep -x obs >/dev/null 2>&1; then
     echo "OBS is running — close it first for scene device path to be updated"
   else
-    python3 - "$CHOSEN" "$OBS_SCENES" <<'PYEOF'
+    # In loopback mode OBS must read from the virtual device, not the physical one
+    _SCENE_DEV="$CHOSEN"
+    modprobe -n v4l2loopback 2>/dev/null && _SCENE_DEV="/dev/video10" || true
+    python3 - "$_SCENE_DEV" "$OBS_SCENES" <<'PYEOF'
 import sys, json, glob, os
 device, sdir = sys.argv[1], sys.argv[2]
 n = 0
@@ -268,6 +271,9 @@ if ! sudo grep -q "EnvironmentFile=-/etc/default/usb-capture" /etc/systemd/syste
   sudo sed -i '/^\[Service\]/a EnvironmentFile=-/etc/default/usb-capture' /etc/systemd/system/usb-capture-monitor.service || true
 fi
 sudo systemctl daemon-reload || true
+# Restart so the service picks up the updated /etc/default/usb-capture immediately
+sudo systemctl restart usb-capture-ffmpeg.service 2>/dev/null || true
+echo "  Capture service restarted (${USB_CAPTURE_BEST_FORMAT:-YUYV} @ ${USB_CAPTURE_BEST_FPS:-30}fps)"
 
 # Install host launch aliases (sobs/cobs)
 if [ -x "$BASEDIR/scripts/generate_obs_aliases.sh" ]; then
