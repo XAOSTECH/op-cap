@@ -29,16 +29,6 @@ for opt in slop uhubctl; do
   fi
 done
 
-# Try loading v4l2loopback to ensure module present
-if command -v modprobe >/dev/null 2>&1; then
-  echo "Attempting to load v4l2loopback module (will be loaded by systemd unit if module available)"
-  sudo modprobe v4l2loopback || true
-  if lsmod | grep -q v4l2loopback; then
-    echo "v4l2loopback module loaded"
-  else
-    echo "v4l2loopback module not loaded — run: make deps  (from the op-cap root) to install it"
-  fi
-fi
 if [ ${#MISSING[@]} -ne 0 ]; then
   echo "Warning: Missing commands: ${MISSING[*]}."
   echo "Please install the missing packages (e.g., sudo apt install ffmpeg v4l-utils v4l2loopback-dkms usbutils)"
@@ -51,6 +41,7 @@ mapfile -t VIDEO_DEVICES < <(
     [ -c "$_d" ] || continue
     if command -v v4l2-ctl >/dev/null 2>&1; then
       v4l2-ctl -d "$_d" --list-formats 2>/dev/null | grep -q '\[0\]' || continue
+      udevadm info -q property -n "$_d" 2>/dev/null | grep -q 'ID_BUS=usb' || continue
     fi
     echo "$_d"
   done

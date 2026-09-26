@@ -349,7 +349,7 @@ generate_report() {
     lsmod | grep -E 'nvidia|amdgpu|i915' || echo "No GPU driver module loaded"
     echo ""
     echo "=== Display Server ==="
-    echo "XDG_SESSION_TYPE: $XDG_SESSION_TYPE"
+    echo "XDG_SESSION_TYPE: ${XDG_SESSION_TYPE:-not set}"
     echo "DISPLAY: ${DISPLAY:-not set}"
     echo "WAYLAND_DISPLAY: ${WAYLAND_DISPLAY:-not set}"
     echo ""

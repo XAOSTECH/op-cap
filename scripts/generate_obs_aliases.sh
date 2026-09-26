@@ -96,7 +96,9 @@ fi
 mapfile -t VIDEO_DEVICES < <(
   for _d in /dev/video*; do
     [[ -c "\$_d" ]] || continue
-    v4l2-ctl -d "\$_d" --list-formats 2>/dev/null | grep -q '\[0\]' && echo "\$_d"
+    v4l2-ctl -d "\$_d" --list-formats 2>/dev/null | grep -q '\[0\]' && \
+    udevadm info -q property -n "\$_d" 2>/dev/null | grep -q 'ID_BUS=usb' && \
+    echo "\$_d"
   done
 )
 if [[ \${#VIDEO_DEVICES[@]} -eq 0 ]]; then
