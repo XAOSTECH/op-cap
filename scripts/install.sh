@@ -133,7 +133,7 @@ if [ -d "$OBS_SCENES" ]; then
   if pgrep -x obs >/dev/null 2>&1; then
     echo "OBS is running — close it first for scene device path to be updated"
   else
-    python3 - "$PERSISTENT_PATH" "$OBS_SCENES" <<'PYEOF'
+    python3 - "$CHOSEN" "$OBS_SCENES" <<'PYEOF'
 import sys, json, glob, os
 device, sdir = sys.argv[1], sys.argv[2]
 n = 0

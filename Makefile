@@ -32,13 +32,16 @@ deps:
 	@echo "Installing required packages for kernel $$(uname -r)..."
 	sudo apt-get install -y ffmpeg v4l-utils usbutils \
 	  v4l2loopback-dkms linux-headers-$$(uname -r) vainfo
-	@echo "Rebuilding v4l2loopback DKMS module for kernel $$(uname -r)..."
+	@echo "Building v4l2loopback DKMS module for kernel $$(uname -r)..."
 	@V4L2LB_VER=$$(dpkg-query -W -f='$${Version}' v4l2loopback-dkms 2>/dev/null | sed 's/^[^:]*://;s/-.*//'); \
-	  [ -n "$$V4L2LB_VER" ] && sudo dkms install "v4l2loopback/$$V4L2LB_VER" -k "$$(uname -r)" 2>/dev/null || true
+	  if [ -n "$$V4L2LB_VER" ]; then \
+	    sudo dkms install "v4l2loopback/$$V4L2LB_VER" -k "$$(uname -r)" 2>&1 || \
+	    echo "WARNING: DKMS build failed for kernel $$(uname -r) — cobs will fall back to direct device mode"; \
+	  fi
 	@echo "Done. Verify: sudo modprobe v4l2loopback && lsmod | grep v4l2loopback"
 
-install: build
-	@modprobe -n v4l2loopback 2>/dev/null || { echo "v4l2loopback module missing for kernel $$(uname -r) — running make deps first..."; $(MAKE) deps; }
+install: build deps
+	@sudo ./scripts/optimise_drivers.sh --auto 2>&1 | grep -v '^[[:space:]]*$$' || true
 	sudo ./scripts/install.sh
 
 optimise-drivers:
