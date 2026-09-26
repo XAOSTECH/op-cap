@@ -13,7 +13,7 @@ _SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BASEDIR="${_SCRIPT_DIR}"  # Default: parent of scripts directory
 DEVICE=""
 VIDPID=""
-OBS_ARGS="--safe-mode --disable-missing-files-check"
+OBS_ARGS=""
 SKIP_DEVICE_CHECK=0
 LOG_DIR="${HOME}/.cache/obs-safe-launch"
 LOG_FILE="$LOG_DIR/obs-crash-$(date +%Y%m%d_%H%M%S).log"
@@ -277,6 +277,19 @@ start_feed() {
     return 1
   fi
 
+  # Reuse the systemd feed if it is already bridging the device to the loopback
+  if systemctl is-active --quiet usb-capture-ffmpeg.service 2>/dev/null; then
+    log_info "Loopback feed already active via usb-capture-ffmpeg.service — skipping feed.sh"
+    return 0
+  fi
+
+  # Release any stale process holding the device before FFmpeg opens it
+  if command -v fuser >/dev/null 2>&1 && fuser "$DEVICE" >/dev/null 2>&1; then
+    log_warn "Device $DEVICE is held by a stale process — releasing..."
+    fuser -k "$DEVICE" 2>/dev/null || true
+    sleep 1
+  fi
+
   log_info "Starting feed.sh: $DEVICE -> $LOOPBACK_DEV (${CAP_RES}@${CAP_FPS} ${CAP_FMT} HDR_MODE=${HDR_MODE})"
   USB_CAPTURE_HDR_MODE="$HDR_MODE" \
     bash "$feed_script" "$DEVICE" "$LOOPBACK_DEV" "$CAP_RES" "$CAP_FPS" "$CAP_FMT" \
@@ -288,7 +301,7 @@ start_feed() {
   sleep 3
 
   if ! kill -0 "$(cat $FEED_PID_FILE)" 2>/dev/null; then
-    log_error "feed.sh died immediately - check device and log: $LOG_FILE"
+    log_error "feed.sh died — check if $DEVICE is held by another process: fuser $DEVICE"
     return 1
   fi
 }
@@ -612,14 +625,14 @@ run_obs() {
         --property=ProtectControlGroups=yes \
         --property=ProtectKernelTunables=yes \
         --quiet \
-        obs $OBS_ARGS
+        obs --safe-mode --disable-missing-files-check $OBS_ARGS
       return $?
     fi
 
     log_warn "--no-device: using standard launch fallback"
   fi
 
-  obs $OBS_ARGS
+  obs --safe-mode --disable-missing-files-check $OBS_ARGS
 }
 
 # Check if OBS was streaming via websocket or log file
@@ -703,10 +716,6 @@ handle_obs_exit() {
     fi
 
     # --safe-mode mirrors the OBS post-crash dialog; --disable-missing-files-check prevents blocking dialogs
-    if [[ "$OBS_ARGS" != *"--safe-mode"* ]]; then
-      log_recovery "Adding --safe-mode --disable-missing-files-check for crash recovery restart"
-      OBS_ARGS="$OBS_ARGS --safe-mode --disable-missing-files-check"
-    fi
 
     log_recovery "Returning 0 (continue loop)"
     set -e
