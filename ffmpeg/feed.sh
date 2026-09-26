@@ -144,21 +144,6 @@ esac
 
 echo "Starting FFmpeg: $IN -> $OUT at ${VID_SIZE}@${FPS}fps (format: ${INPUT_FORMAT}, out: ${OUTPUT_PIX_FMT})"
 
-# MJPG: copy compressed frames directly to the loopback without decoding.
-# v4l2loopback then presents native MJPG to OBS (same format/framerate as the
-# physical device), eliminating the redundant decode → NV12 → re-encode cycle
-# and the emulated-format cycling OBS exhibits when reading decoded raw data.
-if [ "$INPUT_FORMAT" = "MJPG" ] && [ -z "$FILTERS" ] && [ -z "$OVERLAY_FILE" ]; then
-  echo "  Mode: MJPG pass-through (native compressed stream, OBS decodes directly)"
-  ffmpeg -hide_banner -loglevel info \
-    -thread_queue_size 16 -rtbufsize 256M \
-    -f v4l2 -input_format mjpeg -framerate "$FPS" -video_size "$VID_SIZE" -i "$IN" \
-    -vcodec copy -r "$FPS" \
-    -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
-  exit 0
-fi
-
-# Decode pipeline (NV12 / YU12 / YUYV input, or MJPG with filters/overlay)
 # Build filter string
 FINAL_VF=""
 if [ -n "$HDR_FILTER" ] && [ -n "$FILTERS" ]; then
@@ -169,11 +154,7 @@ elif [ -n "$FILTERS" ]; then
   FINAL_VF="${FILTERS}"
 fi
 
-# Run FFmpeg under LD_PRELOAD shim so VIDIOC_S_FMT on the loopback output device
-# gets BT.2020/PQ colorspace rather than the sRGB default the v4l2 muxer writes.
-# V4L2_HDR_SHIM_DEVICE restricts patching to the loopback output only.
 if [ -n "$OVERLAY_FILTER" ]; then
-  # Complex filter path (with overlay)
   FILTER_COMPLEX="${OVERLAY_FILTER}"
   [ -n "$FINAL_VF" ] && FILTER_COMPLEX="${FILTER_COMPLEX},${FINAL_VF}"
   LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
@@ -182,7 +163,7 @@ if [ -n "$OVERLAY_FILTER" ]; then
     -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
     $OVERLAY_INPUT \
     -filter_complex "$FILTER_COMPLEX" \
-    -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" $HDR_OUTPUT_OPTS \
+    -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
     -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
 elif [ -n "$FINAL_VF" ]; then
   LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
@@ -190,14 +171,13 @@ elif [ -n "$FINAL_VF" ]; then
     -thread_queue_size 16 -rtbufsize 256M \
     -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
     -vf "$FINAL_VF" \
-    -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" $HDR_OUTPUT_OPTS \
+    -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
     -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
 else
-  # Clean passthrough: no filter, just relay with color metadata
   LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
   ffmpeg -hide_banner -loglevel info \
     -thread_queue_size 16 -rtbufsize 256M \
     -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
-    -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" $HDR_OUTPUT_OPTS \
+    -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
     -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
 fi
