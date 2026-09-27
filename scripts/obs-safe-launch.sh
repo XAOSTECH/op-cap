@@ -303,34 +303,28 @@ start_feed() {
     fi
     if [ -n "$_audio_src" ]; then
       command -v pactl  >/dev/null 2>&1 || log_warn "pactl not found — install: sudo apt install pulseaudio-utils"
-      command -v ffmpeg >/dev/null 2>&1 || log_warn "ffmpeg not found — audio routing disabled"
-      if command -v pactl >/dev/null 2>&1 && command -v ffmpeg >/dev/null 2>&1; then
-        # Always unload and recreate the sink — prevents stale sinks from previous sessions
-        if pactl list sinks short 2>/dev/null | grep -q 'capture_card_loop'; then
-          local _stale_mod
-          _stale_mod=$(pactl list modules short 2>/dev/null | awk '/module-null-sink/ && /capture_card_loop/ {print $1; exit}')
-          [ -n "$_stale_mod" ] && pactl unload-module "$_stale_mod" >/dev/null 2>&1 || true
+      if command -v pactl >/dev/null 2>&1; then
+        # Unload any stale virtual source from a previous session
+        local _stale_mod
+        _stale_mod=$(pactl list modules short 2>/dev/null | awk '/module-virtual-source/ && /capture_card_loop/ {print $1; exit}')
+        [ -n "$_stale_mod" ] && pactl unload-module "$_stale_mod" >/dev/null 2>&1 || true
+        # module-virtual-source creates a real Audio/Source node visible in OBS's device list
+        if pactl load-module module-virtual-source \
+            source_name=capture_card_loop \
+            master="$_audio_src" \
+            source_properties='device.description="Capture Card Loop"' \
+            >/dev/null 2>&1; then
+          log_ok "Created virtual audio source: capture_card_loop (master: $_audio_src)"
+        else
+          log_warn "module-virtual-source failed — OBS will read USB card directly"
         fi
-        pactl load-module module-null-sink sink_name=capture_card_loop \
-          sink_properties='device.description="Capture Card Loop"' \
-          channels=2 rate=48000 >/dev/null 2>&1 || true
-        sleep 1  # let PipeWire register the new node before OBS enumerates audio sources
-        log_info "Created virtual audio sink: Capture Card Loop"
-        # Patch OBS profile config so the loopback monitor is selected automatically
+        sleep 1  # let PipeWire register before OBS enumerates audio sources
+        # Patch OBS profile ini so capture_card_loop is pre-selected on next OBS start
         local _pname
         _pname=$(awk -F= '/^CurrentProfile=/ {gsub(/[[:space:]]+/,"",$2); print $2; exit}' \
           "${HOME}/.config/obs-studio/global.ini" 2>/dev/null)
         local _ini="${HOME}/.config/obs-studio/basic/profiles/${_pname:-Untitled}/basic.ini"
-        [ -f "$_ini" ] && sed -i "s|=${_audio_src}$|=capture_card_loop.monitor|g" "$_ini" 2>/dev/null || true
-        if ! kill -0 "$(cat "$AUDIO_ROUTER_PID_FILE" 2>/dev/null)" 2>/dev/null; then
-          ffmpeg -hide_banner -loglevel quiet \
-            -f pulse -thread_queue_size 2 -i "$_audio_src" \
-            -acodec pcm_s16le -ar 48000 -ac 2 \
-            -f pulse capture_card_loop \
-            >> "$LOG_FILE" 2>&1 &
-          echo $! > "$AUDIO_ROUTER_PID_FILE"
-          log_ok "Audio router: $_audio_src → Capture Card Loop (PID: $(cat "$AUDIO_ROUTER_PID_FILE"))"
-        fi
+        [ -f "$_ini" ] && sed -i "s|=${_audio_src}$|=capture_card_loop|g" "$_ini" 2>/dev/null || true
       fi
     fi
     return 0
@@ -918,10 +912,10 @@ cleanup() {
   log_info "Cleaning up..."
   stop_feed
   stop_auto_reconnect
-  # Unload virtual audio sink and revert OBS audio config to the physical source
+  # Unload virtual audio source and revert OBS profile ini to the physical source
   if command -v pactl >/dev/null 2>&1; then
     local _mod
-    _mod=$(pactl list modules short 2>/dev/null | awk '/module-null-sink/ && /capture_card_loop/ {print $1; exit}')
+    _mod=$(pactl list modules short 2>/dev/null | awk '/module-virtual-source/ && /capture_card_loop/ {print $1; exit}')
     [ -n "$_mod" ] && pactl unload-module "$_mod" >/dev/null 2>&1 || true
   fi
   local _src="${USB_CAPTURE_AUDIO:-}"
@@ -930,7 +924,7 @@ cleanup() {
     _pname=$(awk -F= '/^CurrentProfile=/ {gsub(/[[:space:]]+/,"",$2); print $2; exit}' \
       "${HOME}/.config/obs-studio/global.ini" 2>/dev/null)
     local _ini="${HOME}/.config/obs-studio/basic/profiles/${_pname:-Untitled}/basic.ini"
-    [ -f "$_ini" ] && sed -i "s|=capture_card_loop.monitor$|=${_src}|g" "$_ini" 2>/dev/null || true
+    [ -f "$_ini" ] && sed -i "s|=capture_card_loop$|=${_src}|g" "$_ini" 2>/dev/null || true
   fi
   # Restart the loopback service if we stopped it for direct-device mode
   if [ "$STOPPED_SERVICE" -eq 1 ]; then
