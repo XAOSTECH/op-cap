@@ -291,7 +291,14 @@ start_feed() {
       sleep 1; _n=$((_n+1))
     done
     # Route capture card audio through FFmpeg so video and audio share the same pipeline timing
-    if [ -n "${USB_CAPTURE_AUDIO:-}" ] && command -v pactl >/dev/null 2>&1 && command -v ffmpeg >/dev/null 2>&1; then
+    local _audio_src="${USB_CAPTURE_AUDIO:-}"
+    # Fallback: detect dynamically if not set in env file (runs as user so pactl works)
+    if [ -z "$_audio_src" ] && command -v pactl >/dev/null 2>&1; then
+      _audio_src=$(pactl list sources short 2>/dev/null | \
+        grep 'alsa_input.*usb' | grep -v monitor | head -1 | awk '{print $2}' || true)
+      [ -n "$_audio_src" ] && log_info "Audio source detected at runtime: $_audio_src"
+    fi
+    if [ -n "$_audio_src" ] && command -v pactl >/dev/null 2>&1 && command -v ffmpeg >/dev/null 2>&1; then
       if ! pactl list sinks short 2>/dev/null | grep -q 'capture_card_loop'; then
         pactl load-module module-null-sink sink_name=capture_card_loop \
           sink_properties='device.description="Capture Card Loop"' \
@@ -301,12 +308,12 @@ start_feed() {
       fi
       if ! kill -0 "$(cat "$AUDIO_ROUTER_PID_FILE" 2>/dev/null)" 2>/dev/null; then
         ffmpeg -hide_banner -loglevel quiet \
-          -f pulse -thread_queue_size 2 -i "$USB_CAPTURE_AUDIO" \
+          -f pulse -thread_queue_size 2 -i "$_audio_src" \
           -acodec pcm_s16le -ar 48000 -ac 2 \
           -f pulse capture_card_loop \
           >> "$LOG_FILE" 2>&1 &
         echo $! > "$AUDIO_ROUTER_PID_FILE"
-        log_ok "Audio router: $USB_CAPTURE_AUDIO → Capture Card Loop (PID: $(cat "$AUDIO_ROUTER_PID_FILE"))"
+        log_ok "Audio router: $_audio_src → Capture Card Loop (PID: $(cat "$AUDIO_ROUTER_PID_FILE"))"
       fi
     fi
     return 0

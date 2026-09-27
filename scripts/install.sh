@@ -178,7 +178,9 @@ fi
 # Detect PulseAudio/PipeWire audio source for the capture card (for A/V sync routing)
 USB_AUDIO_SOURCE=""
 if command -v pactl >/dev/null 2>&1 && [ -n "${_ORIG_USER:-}" ] && [ "$_ORIG_USER" != "root" ]; then
-  USB_AUDIO_SOURCE=$(sudo -u "$_ORIG_USER" pactl list sources short 2>/dev/null | \
+  _uid=$(id -u "$_ORIG_USER" 2>/dev/null || true)
+  USB_AUDIO_SOURCE=$(sudo -u "$_ORIG_USER" XDG_RUNTIME_DIR="/run/user/${_uid:-1000}" \
+    pactl list sources short 2>/dev/null | \
     grep 'alsa_input.*usb' | grep -v monitor | head -1 | awk '{print $2}' || true)
   [ -n "$USB_AUDIO_SOURCE" ] && echo "  Audio source: $USB_AUDIO_SOURCE"
 fi
