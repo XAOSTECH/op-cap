@@ -280,6 +280,12 @@ start_feed() {
   # Reuse the systemd feed if it is already bridging the device to the loopback
   if systemctl is-active --quiet usb-capture-ffmpeg.service 2>/dev/null; then
     log_info "Loopback feed already active via usb-capture-ffmpeg.service — skipping feed.sh"
+    # Wait for FFmpeg to declare its output format on the loopback before OBS opens it
+    local _n=0
+    while [ $_n -lt 8 ]; do
+      v4l2-ctl -d "$LOOPBACK_DEV" --get-fmt-video 2>/dev/null | grep -q 'Width' && break
+      sleep 1; _n=$((_n+1))
+    done
     return 0
   fi
 
@@ -771,6 +777,30 @@ main() {
 
     log_info "Launching OBS pointed at loopback: $LOOPBACK_DEV"
     log_info "OBS should NOT be configured to open $DEVICE directly"
+
+    # Re-patch scene sources to the loopback device on every launch.
+    # OBS writes device_id back to whatever it last used on exit, so this must run
+    # each time. Also clears pixelformat so OBS auto-negotiates with the loopback
+    # rather than trying to match the physical device's saved format.
+    local _obs_scenes="${HOME}/.config/obs-studio/basic/scenes"
+    if command -v python3 >/dev/null 2>&1 && [ -d "$_obs_scenes" ]; then
+      python3 - "$LOOPBACK_DEV" "$_obs_scenes" <<'PYEOF'
+import sys, json, glob, os
+dev, sdir = sys.argv[1], sys.argv[2]
+for fp in glob.glob(os.path.join(sdir, "*.json")):
+    try:
+        with open(fp) as f: d = json.load(f)
+        changed = False
+        for src in d.get("sources", []):
+            if src.get("id") == "v4l2_input":
+                s = src.setdefault("settings", {})
+                if s.get("device_id", "").startswith("/dev/") and s["device_id"] != dev:
+                    s["device_id"] = dev; s["pixelformat"] = 0; changed = True
+        if changed:
+            with open(fp, "w") as f: json.dump(d, f, indent=4)
+    except: pass
+PYEOF
+    fi
   else
     log_info "Skipping loopback/feed (--no-loopback)"
     if [ -n "$DEVICE" ]; then
