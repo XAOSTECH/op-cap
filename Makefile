@@ -30,7 +30,7 @@ shim-debug: $(SHIM_SRC)
 
 deps:
 	@echo "Installing required packages for kernel $$(uname -r)..."
-	sudo apt-get install -y ffmpeg v4l-utils usbutils jq \
+	sudo apt-get install -y ffmpeg v4l-utils usbutils jq pulseaudio-utils \
 	  v4l2loopback-dkms v4l2loopback-utils linux-headers-$$(uname -r) vainfo
 	@echo "Building v4l2loopback DKMS module for kernel $$(uname -r)..."
 	@V4L2LB_VER=$$(dpkg-query -W -f='$${Version}' v4l2loopback-dkms 2>/dev/null | sed 's/^[^:]*://;s/-.*//'); \

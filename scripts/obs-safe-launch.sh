@@ -301,22 +301,26 @@ start_feed() {
       [ -n "$_serial" ] && _audio_src="alsa_input.usb-${_serial}-02.analog-stereo"
       [ -n "$_audio_src" ] && log_info "Derived audio source from USB serial: $_audio_src"
     fi
-    if [ -n "$_audio_src" ] && command -v pactl >/dev/null 2>&1 && command -v ffmpeg >/dev/null 2>&1; then
-      if ! pactl list sinks short 2>/dev/null | grep -q 'capture_card_loop'; then
-        pactl load-module module-null-sink sink_name=capture_card_loop \
-          sink_properties='device.description="Capture Card Loop"' \
-          channels=2 rate=48000 2>/dev/null || true
-        log_info "Created virtual audio sink: Capture Card Loop"
-        log_info "  In OBS Settings → Audio change 'Card' device to 'Capture Card Loop' (one-time)"
-      fi
-      if ! kill -0 "$(cat "$AUDIO_ROUTER_PID_FILE" 2>/dev/null)" 2>/dev/null; then
-        ffmpeg -hide_banner -loglevel quiet \
-          -f pulse -thread_queue_size 2 -i "$_audio_src" \
-          -acodec pcm_s16le -ar 48000 -ac 2 \
-          -f pulse capture_card_loop \
-          >> "$LOG_FILE" 2>&1 &
-        echo $! > "$AUDIO_ROUTER_PID_FILE"
-        log_ok "Audio router: $_audio_src → Capture Card Loop (PID: $(cat "$AUDIO_ROUTER_PID_FILE"))"
+    if [ -n "$_audio_src" ]; then
+      command -v pactl  >/dev/null 2>&1 || log_warn "pactl not found — install: sudo apt install pulseaudio-utils"
+      command -v ffmpeg >/dev/null 2>&1 || log_warn "ffmpeg not found — audio routing disabled"
+      if command -v pactl >/dev/null 2>&1 && command -v ffmpeg >/dev/null 2>&1; then
+        if ! pactl list sinks short 2>/dev/null | grep -q 'capture_card_loop'; then
+          pactl load-module module-null-sink sink_name=capture_card_loop \
+            sink_properties='device.description="Capture Card Loop"' \
+            channels=2 rate=48000 2>/dev/null || true
+          log_info "Created virtual audio sink: Capture Card Loop"
+          log_info "  In OBS Settings → Audio change 'Card' device to 'Capture Card Loop' (one-time)"
+        fi
+        if ! kill -0 "$(cat "$AUDIO_ROUTER_PID_FILE" 2>/dev/null)" 2>/dev/null; then
+          ffmpeg -hide_banner -loglevel quiet \
+            -f pulse -thread_queue_size 2 -i "$_audio_src" \
+            -acodec pcm_s16le -ar 48000 -ac 2 \
+            -f pulse capture_card_loop \
+            >> "$LOG_FILE" 2>&1 &
+          echo $! > "$AUDIO_ROUTER_PID_FILE"
+          log_ok "Audio router: $_audio_src → Capture Card Loop (PID: $(cat "$AUDIO_ROUTER_PID_FILE"))"
+        fi
       fi
     fi
     return 0
