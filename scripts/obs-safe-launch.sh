@@ -283,7 +283,7 @@ start_feed() {
     # Wait for FFmpeg to declare its output format on the loopback before OBS opens it
     local _n=0
     while [ $_n -lt 8 ]; do
-      v4l2-ctl -d "$LOOPBACK_DEV" --get-fmt-video 2>/dev/null | grep -q 'Width' && break
+      v4l2-ctl -d "$LOOPBACK_DEV" --get-fmt-video 2>/dev/null | grep -qE 'Width/Height\s*:\s*[1-9]' && break
       sleep 1; _n=$((_n+1))
     done
     return 0

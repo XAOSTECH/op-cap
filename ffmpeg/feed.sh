@@ -144,40 +144,52 @@ esac
 
 echo "Starting FFmpeg: $IN -> $OUT at ${VID_SIZE}@${FPS}fps (format: ${INPUT_FORMAT}, out: ${OUTPUT_PIX_FMT})"
 
-# Build filter string
-FINAL_VF=""
-if [ -n "$HDR_FILTER" ] && [ -n "$FILTERS" ]; then
-  FINAL_VF="${HDR_FILTER},${FILTERS}"
-elif [ -n "$HDR_FILTER" ]; then
-  FINAL_VF="${HDR_FILTER}"
-elif [ -n "$FILTERS" ]; then
-  FINAL_VF="${FILTERS}"
-fi
-
-if [ -n "$OVERLAY_FILTER" ]; then
-  FILTER_COMPLEX="${OVERLAY_FILTER}"
-  [ -n "$FINAL_VF" ] && FILTER_COMPLEX="${FILTER_COMPLEX},${FINAL_VF}"
-  LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
+# MJPG: decode then re-encode to clean MJPEG so the loopback presents native MJPG.
+# Decoding absorbs hardware corruption; re-encoding always produces a well-formed
+# output frame regardless of what the physical device sent.
+if [ "$INPUT_FORMAT" = "MJPG" ] && [ -z "$FILTERS" ] && [ -z "$OVERLAY_FILE" ]; then
+  echo "  Mode: MJPG decode → MJPEG re-encode (native MJPG in loopback, corruption absorbed)"
   ffmpeg -hide_banner -loglevel info \
     -thread_queue_size 16 -rtbufsize 256M \
-    -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
-    $OVERLAY_INPUT \
-    -filter_complex "$FILTER_COMPLEX" \
-    -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
-    -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
-elif [ -n "$FINAL_VF" ]; then
-  LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
-  ffmpeg -hide_banner -loglevel info \
-    -thread_queue_size 16 -rtbufsize 256M \
-    -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
-    -vf "$FINAL_VF" \
-    -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
+    -f v4l2 -input_format mjpeg -framerate "$FPS" -video_size "$VID_SIZE" -i "$IN" \
+    -vcodec mjpeg -q:v 2 -r "$FPS" \
     -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
 else
-  LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
-  ffmpeg -hide_banner -loglevel info \
-    -thread_queue_size 16 -rtbufsize 256M \
-    -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
-    -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
-    -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
+  # Build filter string
+  FINAL_VF=""
+  if [ -n "$HDR_FILTER" ] && [ -n "$FILTERS" ]; then
+    FINAL_VF="${HDR_FILTER},${FILTERS}"
+  elif [ -n "$HDR_FILTER" ]; then
+    FINAL_VF="${HDR_FILTER}"
+  elif [ -n "$FILTERS" ]; then
+    FINAL_VF="${FILTERS}"
+  fi
+
+  if [ -n "$OVERLAY_FILTER" ]; then
+    FILTER_COMPLEX="${OVERLAY_FILTER}"
+    [ -n "$FINAL_VF" ] && FILTER_COMPLEX="${FILTER_COMPLEX},${FINAL_VF}"
+    LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
+    ffmpeg -hide_banner -loglevel info \
+      -thread_queue_size 16 -rtbufsize 256M \
+      -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
+      $OVERLAY_INPUT \
+      -filter_complex "$FILTER_COMPLEX" \
+      -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
+      -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
+  elif [ -n "$FINAL_VF" ]; then
+    LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
+    ffmpeg -hide_banner -loglevel info \
+      -thread_queue_size 16 -rtbufsize 256M \
+      -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
+      -vf "$FINAL_VF" \
+      -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
+      -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
+  else
+    LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
+    ffmpeg -hide_banner -loglevel info \
+      -thread_queue_size 16 -rtbufsize 256M \
+      -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
+      -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
+      -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
+  fi
 fi
