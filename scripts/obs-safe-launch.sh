@@ -19,6 +19,7 @@ LOG_DIR="${HOME}/.cache/obs-safe-launch"
 LOG_FILE="$LOG_DIR/obs-crash-$(date +%Y%m%d_%H%M%S).log"
 PID_FILE="/tmp/obs-safe-launch-monitor.pid"
 FEED_PID_FILE="/tmp/obs-safe-launch-feed.pid"
+AUDIO_ROUTER_PID_FILE="/tmp/obs-safe-launch-audio-router.pid"
 STREAM_STATE_FILE="/tmp/obs-safe-launch-streaming.state"
 MONITOR_INTERVAL=5
 RECOVERY_TIMEOUT=3
@@ -29,6 +30,8 @@ AUTO_RESUME_ENABLED=1  # Enable auto-resume by default
 # Loopback config
 LOOPBACK_DEV="/dev/video10"
 LOOPBACK_NR=10
+# Load service config so CAP_FPS/CAP_FMT/USB_CAPTURE_AUDIO match the running service
+[ -f /etc/default/usb-capture ] && . /etc/default/usb-capture 2>/dev/null || true
 CAP_RES="${USB_CAPTURE_RES:-3840x2160}"
 CAP_FPS="${USB_CAPTURE_FPS:-30}"
 CAP_FMT="${USB_CAPTURE_FORMAT:-NV12}"
@@ -286,6 +289,25 @@ start_feed() {
       v4l2-ctl -d "$LOOPBACK_DEV" --get-fmt-video 2>/dev/null | grep -qE 'Width/Height\s*:\s*[1-9]' && break
       sleep 1; _n=$((_n+1))
     done
+    # Route capture card audio through FFmpeg so video and audio share the same pipeline timing
+    if [ -n "${USB_CAPTURE_AUDIO:-}" ] && command -v pactl >/dev/null 2>&1 && command -v ffmpeg >/dev/null 2>&1; then
+      if ! pactl list sinks short 2>/dev/null | grep -q 'capture_card_loop'; then
+        pactl load-module module-null-sink sink_name=capture_card_loop \
+          sink_properties='device.description="Capture Card Loop"' \
+          channels=2 rate=48000 2>/dev/null || true
+        log_info "Created virtual audio sink: Capture Card Loop"
+        log_info "  In OBS Settings → Audio change 'Card' device to 'Capture Card Loop' (one-time)"
+      fi
+      if ! kill -0 "$(cat "$AUDIO_ROUTER_PID_FILE" 2>/dev/null)" 2>/dev/null; then
+        ffmpeg -hide_banner -loglevel quiet \
+          -f pulse -thread_queue_size 2 -i "$USB_CAPTURE_AUDIO" \
+          -acodec pcm_s16le -ar 48000 -ac 2 \
+          -f pulse capture_card_loop \
+          >> "$LOG_FILE" 2>&1 &
+        echo $! > "$AUDIO_ROUTER_PID_FILE"
+        log_ok "Audio router: $USB_CAPTURE_AUDIO → Capture Card Loop (PID: $(cat "$AUDIO_ROUTER_PID_FILE"))"
+      fi
+    fi
     return 0
   fi
 
@@ -328,6 +350,11 @@ supervise_feed() {
 
 # Stop feed.sh
 stop_feed() {
+  # Stop audio router
+  if [ -f "$AUDIO_ROUTER_PID_FILE" ]; then
+    kill -TERM "$(cat "$AUDIO_ROUTER_PID_FILE")" 2>/dev/null || true
+    rm -f "$AUDIO_ROUTER_PID_FILE"
+  fi
   if [ -f "$FEED_PID_FILE" ]; then
     local fpid
     fpid=$(cat "$FEED_PID_FILE")
@@ -859,7 +886,7 @@ cleanup() {
   if [ -n "${NO_V4L2_SHIM_DIR:-}" ] && [ -d "$NO_V4L2_SHIM_DIR" ]; then
     rm -rf "$NO_V4L2_SHIM_DIR" || true
   fi
-  rm -f "$PID_FILE" "$STREAM_STATE_FILE"
+  rm -f "$PID_FILE" "$STREAM_STATE_FILE" "$AUDIO_ROUTER_PID_FILE"
   log_info "Shutdown complete"
 }
 

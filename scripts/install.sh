@@ -181,6 +181,14 @@ if [ -n "$OVERLAY_INPUT" ]; then
   fi
 fi
 
+# Detect PulseAudio/PipeWire audio source for the capture card (for A/V sync routing)
+USB_AUDIO_SOURCE=""
+if command -v pactl >/dev/null 2>&1 && [ -n "${_ORIG_USER:-}" ] && [ "$_ORIG_USER" != "root" ]; then
+  USB_AUDIO_SOURCE=$(sudo -u "$_ORIG_USER" pactl list sources short 2>/dev/null | \
+    grep 'alsa_input.*usb' | grep -v monitor | head -1 | awk '{print $2}' || true)
+  [ -n "$USB_AUDIO_SOURCE" ] && echo "  Audio source: $USB_AUDIO_SOURCE"
+fi
+
 ENVFILE=/etc/default/usb-capture
 sudo tee "$ENVFILE" >/dev/null <<EOL
 # USB capture environment file
@@ -199,6 +207,8 @@ USB_CAPTURE_OVERLAY_FILE="${OVERLAY_FILE:-}"
 USB_CAPTURE_OVERLAY_X="${OVERLAY_X}"
 USB_CAPTURE_OVERLAY_Y="${OVERLAY_Y}"
 USB_CAPTURE_OVERLAY_SCALE="${OVERLAY_SCALE}"
+# PulseAudio/PipeWire source for A/V sync routing (auto-detected; set manually if wrong)
+USB_CAPTURE_AUDIO="${USB_AUDIO_SOURCE:-}"
 EOL
 sudo chmod 644 "$ENVFILE"
 
