@@ -268,6 +268,36 @@ verify_v4l2loopback() {
   return 1
 }
 
+setup_virtual_audio() {
+  local _src="${USB_CAPTURE_AUDIO:-}"
+  if [ -z "$_src" ] && [ -n "${USB_CAPTURE_VIDEO:-}" ]; then
+    local _serial
+    _serial=$(basename "$USB_CAPTURE_VIDEO" | sed 's/usb-\(.*\)-video-index[0-9]*/\1/')
+    [ -n "$_serial" ] && _src="alsa_input.usb-${_serial}-02.analog-stereo"
+  fi
+  [ -n "$_src" ] || { log_warn "No USB audio source — Mic/Aux will be silent"; return 0; }
+  command -v pactl >/dev/null 2>&1 || { log_warn "pactl not found — install pulseaudio-utils"; return 0; }
+  log_info "Audio source: $_src"
+  local _stale
+  _stale=$(pactl list modules short 2>/dev/null | awk '/module-virtual-source/ && /capture_card_loop/ {print $1; exit}')
+  [ -n "$_stale" ] && pactl unload-module "$_stale" >/dev/null 2>&1 || true
+  if pactl load-module module-virtual-source \
+      source_name=capture_card_loop \
+      master="$_src" \
+      source_properties='device.description="Capture Card Loopback"' \
+      >/dev/null 2>&1; then
+    log_ok "Virtual audio source ready: capture_card_loop → $_src"
+  else
+    log_warn "module-virtual-source failed — OBS will read USB card directly"
+  fi
+  sleep 1
+  local _pname
+  _pname=$(awk -F= '/^CurrentProfile=/ {gsub(/[[:space:]]+/,"",$2); print $2; exit}' \
+    "${HOME}/.config/obs-studio/global.ini" 2>/dev/null)
+  local _ini="${HOME}/.config/obs-studio/basic/profiles/${_pname:-Untitled}/basic.ini"
+  [ -f "$_ini" ] && sed -i "s|=${_src}$|=capture_card_loop|g" "$_ini" 2>/dev/null || true
+}
+
 # Start feed.sh: bridge USB device -> v4l2loopback
 start_feed() {
   if [ -z "$DEVICE" ]; then
@@ -290,43 +320,7 @@ start_feed() {
       v4l2-ctl -d "$LOOPBACK_DEV" --get-fmt-video 2>/dev/null | grep -qE 'Width/Height\s*:\s*[1-9]' && break
       sleep 1; _n=$((_n+1))
     done
-    sleep 1  # allow service framerate (VIDIOC_S_PARM) to settle after dimensions are declared
-    # Route capture card audio through FFmpeg so video and audio share the same pipeline timing
-    local _audio_src="${USB_CAPTURE_AUDIO:-}"
-    log_info "Audio source configured: '${_audio_src:-<empty>}'"
-    # Derive from USB serial in USB_CAPTURE_VIDEO if not stored in env file
-    if [ -z "$_audio_src" ] && [ -n "${USB_CAPTURE_VIDEO:-}" ]; then
-      local _serial
-      _serial=$(basename "$USB_CAPTURE_VIDEO" | sed 's/usb-\(.*\)-video-index[0-9]*/\1/')
-      [ -n "$_serial" ] && _audio_src="alsa_input.usb-${_serial}-02.analog-stereo"
-      [ -n "$_audio_src" ] && log_info "Derived audio source from USB serial: $_audio_src"
-    fi
-    if [ -n "$_audio_src" ]; then
-      command -v pactl  >/dev/null 2>&1 || log_warn "pactl not found — install: sudo apt install pulseaudio-utils"
-      if command -v pactl >/dev/null 2>&1; then
-        # Unload any stale virtual source from a previous session
-        local _stale_mod
-        _stale_mod=$(pactl list modules short 2>/dev/null | awk '/module-virtual-source/ && /capture_card_loop/ {print $1; exit}')
-        [ -n "$_stale_mod" ] && pactl unload-module "$_stale_mod" >/dev/null 2>&1 || true
-        # module-virtual-source creates a real Audio/Source node visible in OBS's device list
-        if pactl load-module module-virtual-source \
-            source_name=capture_card_loop \
-            master="$_audio_src" \
-            source_properties='device.description="Capture Card Loop"' \
-            >/dev/null 2>&1; then
-          log_ok "Created virtual audio source: capture_card_loop (master: $_audio_src)"
-        else
-          log_warn "module-virtual-source failed — OBS will read USB card directly"
-        fi
-        sleep 1  # let PipeWire register before OBS enumerates audio sources
-        # Patch OBS profile ini so capture_card_loop is pre-selected on next OBS start
-        local _pname
-        _pname=$(awk -F= '/^CurrentProfile=/ {gsub(/[[:space:]]+/,"",$2); print $2; exit}' \
-          "${HOME}/.config/obs-studio/global.ini" 2>/dev/null)
-        local _ini="${HOME}/.config/obs-studio/basic/profiles/${_pname:-Untitled}/basic.ini"
-        [ -f "$_ini" ] && sed -i "s|=${_audio_src}$|=capture_card_loop|g" "$_ini" 2>/dev/null || true
-      fi
-    fi
+    sleep 1
     return 0
   fi
 
@@ -353,16 +347,33 @@ start_feed() {
   fi
 }
 
-# Watchdog: restart feed.sh if it dies, without restarting OBS
+# Watchdog: restart feed.sh on death or I/O freeze, exits when PID_FILE is removed
 supervise_feed() {
-  while true; do
+  local _hung=0
+  while [ -f "$PID_FILE" ]; do
     sleep 5
+    [ -f "$PID_FILE" ] || break
     local fpid
     fpid=$(cat "$FEED_PID_FILE" 2>/dev/null || echo "")
     if [ -z "$fpid" ] || ! kill -0 "$fpid" 2>/dev/null; then
       log_warn "feed.sh died (PID: ${fpid:-unknown}). Restarting in 2s..."
       sleep 2
+      [ -f "$PID_FILE" ] || break
       start_feed || log_error "feed.sh restart failed"
+      _hung=0; continue
+    fi
+    # Detect frozen FFmpeg stuck on device I/O (uninterruptible sleep)
+    local _state
+    _state=$(awk '{print $3}' /proc/"$fpid"/stat 2>/dev/null)
+    if [ "$_state" = "D" ]; then
+      _hung=$((_hung+1))
+      if [ $_hung -ge 3 ]; then
+        log_warn "feed.sh frozen (D-state ×${_hung}) — force-restarting"
+        kill -9 "$fpid" 2>/dev/null || true; rm -f "$FEED_PID_FILE"
+        _hung=0
+      fi
+    else
+      _hung=0
     fi
   done
 }
@@ -427,12 +438,11 @@ start_auto_reconnect() {
 # Stop auto-reconnect monitor and any feed supervisor recorded in PID_FILE
 stop_auto_reconnect() {
   if [ -f "$PID_FILE" ]; then
-    while IFS= read -r pid; do
-      [ -n "$pid" ] || continue
-      kill -0 "$pid" 2>/dev/null && kill "$pid" 2>/dev/null || true
-    done < "$PID_FILE"
+    local _pids=()
+    while IFS= read -r _p; do [ -n "$_p" ] && _pids+=("$_p"); done < "$PID_FILE"
+    rm -f "$PID_FILE"  # remove before kills so supervise_feed loop exits cleanly
+    for _p in "${_pids[@]}"; do kill "$_p" 2>/dev/null || true; done
     sleep 1
-    rm -f "$PID_FILE"
   fi
 }
 
@@ -820,6 +830,7 @@ main() {
 
   if [ "$USE_LOOPBACK" -eq 1 ]; then
     start_feed
+    setup_virtual_audio
     # Only supervise if we started our own feed; service-managed feeds need no watchdog
     if [ -f "$FEED_PID_FILE" ]; then
       supervise_feed &
