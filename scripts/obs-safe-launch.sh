@@ -308,9 +308,10 @@ start_feed() {
         if ! pactl list sinks short 2>/dev/null | grep -q 'capture_card_loop'; then
           pactl load-module module-null-sink sink_name=capture_card_loop \
             sink_properties='device.description="Capture Card Loop"' \
-            channels=2 rate=48000 2>/dev/null || true
+            channels=2 rate=48000 >/dev/null 2>&1 || true
+          sleep 1  # let PipeWire register the new node before OBS enumerates audio sources
           log_info "Created virtual audio sink: Capture Card Loop"
-          log_info "  In OBS Settings → Audio change 'Card' device to 'Capture Card Loop' (one-time)"
+          log_info "  In OBS Settings → Audio change 'Card' to 'Monitor of Capture Card Loop' (one-time)"
         fi
         if ! kill -0 "$(cat "$AUDIO_ROUTER_PID_FILE" 2>/dev/null)" 2>/dev/null; then
           ffmpeg -hide_banner -loglevel quiet \
