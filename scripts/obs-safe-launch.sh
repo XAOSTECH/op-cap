@@ -41,6 +41,7 @@ ISOLATED_CONFIG_DIR=""
 NO_V4L2_SHIM_DIR=""
 STOP_REQUESTED=0
 INTERRUPT_COUNT=0
+STOPPED_SERVICE=0
 SANDBOX_PROBED=0
 SANDBOX_SUPPORTED=0
 
@@ -374,6 +375,12 @@ stop_feed() {
 start_auto_reconnect() {
   if [ -z "$DEVICE" ]; then
     log_info "Skipping auto-reconnect (no device specified)"
+    return 0
+  fi
+
+  # In no-loopback mode the wrapper crash-recovery loop handles restarts directly
+  if [ "$USE_LOOPBACK" -eq 0 ]; then
+    log_info "Skipping auto-reconnect (direct-device mode: crash recovery handles restarts)"
     return 0
   fi
 
@@ -822,6 +829,23 @@ main() {
     log_info "Skipping loopback/feed (--no-loopback)"
     if [ -n "$DEVICE" ]; then
       log_info "Configure OBS source to use device directly: $DEVICE"
+      # Stop the loopback service so the physical device is free for direct use
+      if systemctl is-active --quiet usb-capture-ffmpeg.service 2>/dev/null; then
+        log_warn "Stopping usb-capture-ffmpeg.service to free $DEVICE for direct access..."
+        sudo systemctl stop usb-capture-ffmpeg.service 2>/dev/null || true
+        STOPPED_SERVICE=1
+        sleep 2
+      fi
+      # Patch scene to the physical device so OBS does not open the loopback
+      local _obs_scenes="${HOME}/.config/obs-studio/basic/scenes"
+      if command -v jq >/dev/null 2>&1 && [ -d "$_obs_scenes" ]; then
+        for _fp in "$_obs_scenes"/*.json; do
+          [ -f "$_fp" ] || continue
+          jq --arg dev "$DEVICE" \
+            '.sources |= map(if .id == "v4l2_input" and ((.settings.device_id // "") | startswith("/dev/")) and .settings.device_id != $dev then .settings.device_id = $dev | .settings.pixelformat = 0 else . end)' \
+            "$_fp" > "${_fp}.tmp" 2>/dev/null && mv "${_fp}.tmp" "$_fp" || rm -f "${_fp}.tmp"
+        done
+      fi
     fi
   fi
 
@@ -870,6 +894,11 @@ cleanup() {
   log_info "Cleaning up..."
   stop_feed
   stop_auto_reconnect
+  # Restart the loopback service if we stopped it for direct-device mode
+  if [ "$STOPPED_SERVICE" -eq 1 ]; then
+    log_info "Restarting usb-capture-ffmpeg.service..."
+    sudo systemctl start usb-capture-ffmpeg.service 2>/dev/null || true
+  fi
   if [ -n "${ISOLATED_CONFIG_DIR:-}" ] && [ -d "$ISOLATED_CONFIG_DIR" ]; then
     rm -rf "$ISOLATED_CONFIG_DIR" || true
   fi
