@@ -135,25 +135,19 @@ if [ -d "$OBS_SCENES" ]; then
     # In loopback mode OBS must read from the virtual device, not the physical one
     _SCENE_DEV="$CHOSEN"
     modprobe -n v4l2loopback 2>/dev/null && _SCENE_DEV="/dev/video10" || true
-    python3 - "$_SCENE_DEV" "$OBS_SCENES" <<'PYEOF'
-import sys, json, glob, os
-device, sdir = sys.argv[1], sys.argv[2]
-n = 0
-for fp in glob.glob(os.path.join(sdir, "*.json")):
-    try:
-        with open(fp) as f: data = json.load(f)
-        changed = False
-        for src in data.get("sources", []):
-            if src.get("id") == "v4l2_input":
-                s = src.setdefault("settings", {})
-                if s.get("device_id", "").startswith("/dev/"):
-                    s["device_id"] = device; changed = True; n += 1
-        if changed:
-            with open(fp, "w") as f: json.dump(data, f, indent=4)
-    except Exception as e:
-        print(f"  warning: {fp}: {e}")
-print(f"  Updated {n} v4l2_input source(s) to {device}" if n else "  No v4l2_input sources found — configure Capcard device in OBS manually")
-PYEOF
+    _n=0
+    for _fp in "$OBS_SCENES"/*.json; do
+      [ -f "$_fp" ] || continue
+      _count=$(jq --arg dev "$_SCENE_DEV" \
+        '[.sources[]? | select(.id == "v4l2_input" and ((.settings.device_id // "") | startswith("/dev/")) and .settings.device_id != $dev)] | length' \
+        "$_fp" 2>/dev/null) || continue
+      [ "${_count:-0}" -gt 0 ] || continue
+      jq --arg dev "$_SCENE_DEV" \
+        '.sources |= map(if .id == "v4l2_input" and ((.settings.device_id // "") | startswith("/dev/")) and .settings.device_id != $dev then .settings.device_id = $dev | .settings.pixelformat = 0 else . end)' \
+        "$_fp" > "${_fp}.tmp" && mv "${_fp}.tmp" "$_fp"
+      _n=$((_n + _count))
+    done
+    [ "$_n" -gt 0 ] && echo "  Updated $_n v4l2_input source(s) to $_SCENE_DEV" || echo "  No v4l2_input sources found — configure Capcard device in OBS manually"
   fi
 fi
 

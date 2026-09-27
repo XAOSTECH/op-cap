@@ -810,23 +810,13 @@ main() {
     # each time. Also clears pixelformat so OBS auto-negotiates with the loopback
     # rather than trying to match the physical device's saved format.
     local _obs_scenes="${HOME}/.config/obs-studio/basic/scenes"
-    if command -v python3 >/dev/null 2>&1 && [ -d "$_obs_scenes" ]; then
-      python3 - "$LOOPBACK_DEV" "$_obs_scenes" <<'PYEOF'
-import sys, json, glob, os
-dev, sdir = sys.argv[1], sys.argv[2]
-for fp in glob.glob(os.path.join(sdir, "*.json")):
-    try:
-        with open(fp) as f: d = json.load(f)
-        changed = False
-        for src in d.get("sources", []):
-            if src.get("id") == "v4l2_input":
-                s = src.setdefault("settings", {})
-                if s.get("device_id", "").startswith("/dev/") and s["device_id"] != dev:
-                    s["device_id"] = dev; s["pixelformat"] = 0; changed = True
-        if changed:
-            with open(fp, "w") as f: json.dump(d, f, indent=4)
-    except: pass
-PYEOF
+    if command -v jq >/dev/null 2>&1 && [ -d "$_obs_scenes" ]; then
+      for _fp in "$_obs_scenes"/*.json; do
+        [ -f "$_fp" ] || continue
+        jq --arg dev "$LOOPBACK_DEV" \
+          '.sources |= map(if .id == "v4l2_input" and ((.settings.device_id // "") | startswith("/dev/")) and .settings.device_id != $dev then .settings.device_id = $dev | .settings.pixelformat = 0 else . end)' \
+          "$_fp" > "${_fp}.tmp" 2>/dev/null && mv "${_fp}.tmp" "$_fp" || rm -f "${_fp}.tmp"
+      done
     fi
   else
     log_info "Skipping loopback/feed (--no-loopback)"
