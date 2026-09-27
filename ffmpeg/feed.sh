@@ -152,7 +152,7 @@ if [ "$INPUT_FORMAT" = "MJPG" ] && [ -z "$FILTERS" ] && [ -z "$OVERLAY_FILE" ]; 
   ffmpeg -hide_banner -loglevel info \
     -thread_queue_size 16 -rtbufsize 256M \
     -f v4l2 -input_format mjpeg -framerate "$FPS" -video_size "$VID_SIZE" -i "$IN" \
-    -vcodec mjpeg -pix_fmt yuvj422p -q:v 2 -r "$FPS" \
+    -vcodec mjpeg -q:v 2 -r "$FPS" \
     -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
 else
   # Build filter string
