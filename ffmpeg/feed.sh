@@ -151,7 +151,9 @@ if [ "$INPUT_FORMAT" = "MJPG" ] && [ -z "$FILTERS" ] && [ -z "$OVERLAY_FILE" ]; 
   echo "  Mode: MJPG decode → MJPEG re-encode (native MJPG in loopback, corruption absorbed)"
   ffmpeg -hide_banner -loglevel info \
     -thread_queue_size 16 -rtbufsize 256M \
-    -f v4l2 -input_format mjpeg -framerate "$FPS" -video_size "$VID_SIZE" -i "$IN" \
+    -f v4l2 -input_format mjpeg -framerate "$FPS" -video_size "$VID_SIZE" \
+    -fflags +genpts+discardcorrupt -err_detect ignore_err \
+    -i "$IN" \
     -vcodec mjpeg -q:v 2 -r "$FPS" \
     -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
 else

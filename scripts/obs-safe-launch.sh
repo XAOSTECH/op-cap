@@ -375,6 +375,9 @@ supervise_feed() {
         kill -9 "$_ffpid" 2>/dev/null || true
         kill -9 "$fpid"   2>/dev/null || true
         rm -f "$FEED_PID_FILE"; _hung=0; _last_wb=""
+        sleep 2
+        [ -f "$PID_FILE" ] || break
+        start_feed || log_error "feed.sh restart failed after freeze"
       fi
     else
       _hung=0; _last_wb="$_wb"
