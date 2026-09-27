@@ -243,7 +243,7 @@ Type=simple
 EnvironmentFile=-/etc/default/usb-capture
 ExecStartPre=-/sbin/modprobe -r v4l2loopback
 ExecStartPre=-/bin/sleep 1
-ExecStartPre=-/sbin/modprobe v4l2loopback video_nr=10 card_label="USB_Capture_Loop" exclusive_caps=1
+ExecStartPre=-/sbin/modprobe v4l2loopback video_nr=10 card_label="USB_Capture_Loop" exclusive_caps=0
 ExecStart=/bin/bash -c '$FF_SCRIPT \${USB_CAPTURE_VIDEO} /dev/video10 \${USB_CAPTURE_RES:-3840x2160} \${USB_CAPTURE_FPS:-30}'
 Restart=on-failure
 RestartSec=3
