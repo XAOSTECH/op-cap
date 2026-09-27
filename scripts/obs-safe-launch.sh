@@ -347,9 +347,9 @@ start_feed() {
   fi
 }
 
-# Watchdog: restart feed.sh on death or I/O freeze, exits when PID_FILE is removed
+# Watchdog: restart feed.sh on death or output freeze, exits when PID_FILE is removed
 supervise_feed() {
-  local _hung=0
+  local _hung=0 _last_wb=""
   while [ -f "$PID_FILE" ]; do
     sleep 5
     [ -f "$PID_FILE" ] || break
@@ -360,20 +360,24 @@ supervise_feed() {
       sleep 2
       [ -f "$PID_FILE" ] || break
       start_feed || log_error "feed.sh restart failed"
-      _hung=0; continue
+      _hung=0; _last_wb=""; continue
     fi
-    # Detect frozen FFmpeg stuck on device I/O (uninterruptible sleep)
-    local _state
-    _state=$(awk '{print $3}' /proc/"$fpid"/stat 2>/dev/null)
-    if [ "$_state" = "D" ]; then
+    # feed.sh is a bash wrapper; find the actual FFmpeg child
+    local _ffpid
+    _ffpid=$(pgrep -n -P "$fpid" 2>/dev/null || echo "$fpid")
+    # Freeze: FFmpeg alive but write_bytes to /dev/video10 stopped increasing
+    local _wb
+    _wb=$(grep '^write_bytes:' /proc/"$_ffpid"/io 2>/dev/null | awk '{print $2}')
+    if [ -n "$_last_wb" ] && [ -n "$_wb" ] && [ "$_wb" = "$_last_wb" ]; then
       _hung=$((_hung+1))
-      if [ $_hung -ge 3 ]; then
-        log_warn "feed.sh frozen (D-state ×${_hung}) — force-restarting"
-        kill -9 "$fpid" 2>/dev/null || true; rm -f "$FEED_PID_FILE"
-        _hung=0
+      if [ $_hung -ge 2 ]; then
+        log_warn "feed.sh frozen (no loopback output for ~$(((_hung+1)*5))s) — restarting"
+        kill -9 "$_ffpid" 2>/dev/null || true
+        kill -9 "$fpid"   2>/dev/null || true
+        rm -f "$FEED_PID_FILE"; _hung=0; _last_wb=""
       fi
     else
-      _hung=0
+      _hung=0; _last_wb="$_wb"
     fi
   done
 }
