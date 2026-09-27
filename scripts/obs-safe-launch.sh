@@ -292,11 +292,12 @@ start_feed() {
     done
     # Route capture card audio through FFmpeg so video and audio share the same pipeline timing
     local _audio_src="${USB_CAPTURE_AUDIO:-}"
-    # Fallback: detect dynamically if not set in env file (runs as user so pactl works)
-    if [ -z "$_audio_src" ] && command -v pactl >/dev/null 2>&1; then
-      _audio_src=$(pactl list sources short 2>/dev/null | \
-        grep 'alsa_input.*usb' | grep -v monitor | head -1 | awk '{print $2}' || true)
-      [ -n "$_audio_src" ] && log_info "Audio source detected at runtime: $_audio_src"
+    # Derive from USB serial in USB_CAPTURE_VIDEO if not stored in env file
+    if [ -z "$_audio_src" ] && [ -n "${USB_CAPTURE_VIDEO:-}" ]; then
+      local _serial
+      _serial=$(basename "$USB_CAPTURE_VIDEO" | sed 's/usb-\(.*\)-video-index[0-9]*/\1/')
+      [ -n "$_serial" ] && _audio_src="alsa_input.usb-${_serial}-02.analog-stereo"
+      [ -n "$_audio_src" ] && log_info "Derived audio source from USB serial: $_audio_src"
     fi
     if [ -n "$_audio_src" ] && command -v pactl >/dev/null 2>&1 && command -v ffmpeg >/dev/null 2>&1; then
       if ! pactl list sinks short 2>/dev/null | grep -q 'capture_card_loop'; then

@@ -175,15 +175,11 @@ if [ -n "$OVERLAY_INPUT" ]; then
   fi
 fi
 
-# Detect PulseAudio/PipeWire audio source for the capture card (for A/V sync routing)
+# Derive audio source name from the video device's USB serial (embedded in persistent path)
+_serial=$(basename "${PERSISTENT_PATH:-}" | sed 's/usb-\(.*\)-video-index[0-9]*/\1/')
 USB_AUDIO_SOURCE=""
-if command -v pactl >/dev/null 2>&1 && [ -n "${_ORIG_USER:-}" ] && [ "$_ORIG_USER" != "root" ]; then
-  _uid=$(id -u "$_ORIG_USER" 2>/dev/null || true)
-  USB_AUDIO_SOURCE=$(sudo -u "$_ORIG_USER" XDG_RUNTIME_DIR="/run/user/${_uid:-1000}" \
-    pactl list sources short 2>/dev/null | \
-    grep 'alsa_input.*usb' | grep -v monitor | head -1 | awk '{print $2}' || true)
-  [ -n "$USB_AUDIO_SOURCE" ] && echo "  Audio source: $USB_AUDIO_SOURCE"
-fi
+[ -n "$_serial" ] && USB_AUDIO_SOURCE="alsa_input.usb-${_serial}-02.analog-stereo"
+[ -n "$USB_AUDIO_SOURCE" ] && echo "  Audio source: $USB_AUDIO_SOURCE"
 
 ENVFILE=/etc/default/usb-capture
 sudo tee "$ENVFILE" >/dev/null <<EOL
