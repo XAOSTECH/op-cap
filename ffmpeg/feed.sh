@@ -150,7 +150,7 @@ echo "Starting FFmpeg: $IN -> $OUT at ${VID_SIZE}@${FPS}fps (format: ${INPUT_FOR
 if [ "$INPUT_FORMAT" = "MJPG" ] && [ -z "$FILTERS" ] && [ -z "$OVERLAY_FILE" ]; then
   echo "  Mode: MJPG decode → MJPEG re-encode (native MJPG in loopback, corruption absorbed)"
   ffmpeg -hide_banner -loglevel info \
-    -thread_queue_size 4 \
+    -thread_queue_size 8 \
     -f v4l2 -input_format mjpeg -framerate "$FPS" -video_size "$VID_SIZE" \
     -fflags +genpts+discardcorrupt -err_detect ignore_err \
     -i "$IN" \
@@ -172,7 +172,7 @@ else
     [ -n "$FINAL_VF" ] && FILTER_COMPLEX="${FILTER_COMPLEX},${FINAL_VF}"
     LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
     ffmpeg -hide_banner -loglevel info \
-      -thread_queue_size 4 \
+      -thread_queue_size 8 \
       -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
       $OVERLAY_INPUT \
       -filter_complex "$FILTER_COMPLEX" \
@@ -181,7 +181,7 @@ else
   elif [ -n "$FINAL_VF" ]; then
     LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
     ffmpeg -hide_banner -loglevel info \
-      -thread_queue_size 4 \
+      -thread_queue_size 8 \
       -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
       -vf "$FINAL_VF" \
       -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
@@ -189,7 +189,7 @@ else
   else
     LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
     ffmpeg -hide_banner -loglevel info \
-      -thread_queue_size 4 \
+      -thread_queue_size 8 \
       -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
       -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
       -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"

@@ -282,7 +282,7 @@ setup_virtual_audio() {
   pactl list modules short 2>/dev/null | awk '/module-loopback/       && /capture_card_loop/ {print $1}' | xargs -r -I{} pactl unload-module {} 2>/dev/null || true
   pactl list modules short 2>/dev/null | awk '/module-null-sink/      && /capture_card_loop_sink/ {print $1}' | xargs -r -I{} pactl unload-module {} 2>/dev/null || true
   pactl load-module module-null-sink sink_name=capture_card_loop_sink channels=2 rate=48000 >/dev/null 2>&1 || true
-  pactl load-module module-loopback source="$_src" sink=capture_card_loop_sink latency_msec=100 >/dev/null 2>&1 || true
+  pactl load-module module-loopback source="$_src" sink=capture_card_loop_sink latency_msec=130 >/dev/null 2>&1 || true
   if pactl load-module module-virtual-source source_name=capture_card_loop master=capture_card_loop_sink.monitor source_properties='device.description="Capture Card Loopback"' >/dev/null 2>&1; then
     log_ok "Virtual audio source ready: capture_card_loop (+100ms delay via $_src)"
   else
@@ -293,16 +293,6 @@ setup_virtual_audio() {
   _pname=$(awk -F= '/^CurrentProfile=/ {gsub(/[[:space:]]+/,"",$2); print $2; exit}' "${HOME}/.config/obs-studio/global.ini" 2>/dev/null)
   local _ini="${HOME}/.config/obs-studio/basic/profiles/${_pname:-Untitled}/basic.ini"
   [ -f "$_ini" ] && sed -i "s|=${_src}$|=capture_card_loop|g" "$_ini" 2>/dev/null || true
-}
-
-setup_loopback_timeout_image() {
-  command -v v4l2loopback-ctl >/dev/null 2>&1 || return 0
-  command -v ffmpeg           >/dev/null 2>&1 || return 0
-  [ -n "${LOOPBACK_DEV:-}" ]                  || return 0
-  local _w=${CAP_RES%x*} _h=${CAP_RES#*x}
-  local _img="/tmp/obs-loopback-placeholder.jpg"
-  ffmpeg -hide_banner -loglevel quiet -f lavfi -i "color=black:size=${_w}x${_h}" -frames:v 1 -q:v 2 "$_img" 2>/dev/null || return 0
-  v4l2loopback-ctl set-timeout-image -t 3000 "$LOOPBACK_DEV" "$_img" 2>/dev/null && log_info "Loopback hold frame set (${CAP_RES})" || true
 }
 
 # Start feed.sh: bridge USB device -> v4l2loopback
@@ -845,7 +835,6 @@ main() {
   if [ "$USE_LOOPBACK" -eq 1 ]; then
     start_feed
     setup_virtual_audio
-    setup_loopback_timeout_image
     # Only supervise if we started our own feed; service-managed feeds need no watchdog
     if [ -f "$FEED_PID_FILE" ]; then
       supervise_feed &
