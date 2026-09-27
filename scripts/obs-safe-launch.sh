@@ -290,8 +290,10 @@ start_feed() {
       v4l2-ctl -d "$LOOPBACK_DEV" --get-fmt-video 2>/dev/null | grep -qE 'Width/Height\s*:\s*[1-9]' && break
       sleep 1; _n=$((_n+1))
     done
+    sleep 1  # allow service framerate (VIDIOC_S_PARM) to settle after dimensions are declared
     # Route capture card audio through FFmpeg so video and audio share the same pipeline timing
     local _audio_src="${USB_CAPTURE_AUDIO:-}"
+    log_info "Audio source configured: '${_audio_src:-<empty>}'"
     # Derive from USB serial in USB_CAPTURE_VIDEO if not stored in env file
     if [ -z "$_audio_src" ] && [ -n "${USB_CAPTURE_VIDEO:-}" ]; then
       local _serial
