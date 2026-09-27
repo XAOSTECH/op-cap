@@ -881,6 +881,12 @@ main() {
         STOPPED_SERVICE=1
         sleep 2
       fi
+      # Release any stale process (e.g. leftover feed.sh from a previous cobs session)
+      if command -v fuser >/dev/null 2>&1 && fuser "$DEVICE" >/dev/null 2>&1; then
+        log_warn "Releasing stale process holding $DEVICE..."
+        fuser -k "$DEVICE" 2>/dev/null || true
+        sleep 1
+      fi
       # Patch scene to the physical device so OBS does not open the loopback
       local _obs_scenes="${HOME}/.config/obs-studio/basic/scenes"
       if command -v jq >/dev/null 2>&1 && [ -d "$_obs_scenes" ]; then
