@@ -372,7 +372,7 @@ supervise_feed() {
         kill -9 "$_ffpid" 2>/dev/null || true
         kill -9 "$fpid"   2>/dev/null || true
         rm -f "$FEED_PID_FILE"; _hung=0; _last_wb=""
-        sleep 2
+        sleep 5
         [ -f "$PID_FILE" ] || break
         start_feed || log_error "feed.sh restart failed after freeze"
       fi
@@ -701,6 +701,18 @@ run_obs() {
     fi
 
     log_warn "--no-device: using standard launch fallback"
+  fi
+
+  # In loopback mode, hide the physical capture device so OBS cannot fall back
+  # to reading it directly when the loopback stalls (which blocks the FFmpeg reader).
+  if [ "$USE_LOOPBACK" -eq 1 ] && [ -n "${DEVICE:-}" ]; then
+    local _shim="$BASEDIR/src/hide_v4l2.so"
+    if [ -f "$_shim" ]; then
+      local _preload="${LD_PRELOAD:+$LD_PRELOAD:}$_shim"
+      HIDE_V4L2_DEVICE="$DEVICE" LD_PRELOAD="$_preload" \
+        obs --safe-mode --disable-missing-files-check $OBS_ARGS
+      return $?
+    fi
   fi
 
   obs --safe-mode --disable-missing-files-check $OBS_ARGS
