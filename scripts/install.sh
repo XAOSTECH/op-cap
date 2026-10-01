@@ -12,6 +12,13 @@ else
   echo "GCC not found. Install build-essential"; exit 1
 fi
 
+# Install all required packages up front - never ask the user to install manually
+echo "Installing required packages for kernel $(uname -r)..."
+sudo apt-get install -y \
+  ffmpeg v4l-utils usbutils jq pulseaudio-utils \
+  v4l2loopback-dkms v4l2loopback-utils \
+  "linux-headers-$(uname -r)" vainfo build-essential
+
 # Validation checks: ensure required commands exist
 echo "Checking for required dependencies..."
 MISSING=()
@@ -21,18 +28,12 @@ for cmd in ffmpeg v4l2-ctl modprobe systemctl udevadm lsusb journalctl; do
   fi
 done
 
-# Suggest installing helpful utilities
-echo "Checking optional utilities: 'slop' for delogo pick and 'uhubctl' for hub power control"
-for opt in slop uhubctl; do
-  if ! command -v $opt >/dev/null 2>&1; then
-    echo "Optional: $opt not installed. Install if you want $opt-related features."
-  fi
-done
-
 if [ ${#MISSING[@]} -ne 0 ]; then
-  echo "Warning: Missing commands: ${MISSING[*]}."
-  echo "Please install the missing packages (e.g., sudo apt install ffmpeg v4l-utils v4l2loopback-dkms usbutils)"
+  echo "Error: still missing after install: ${MISSING[*]}. Check apt output above."
+  exit 1
 fi
+
+# Check optional utilities (no action taken if absent)
 
 # Interactive selection: detect /dev/video* and ask the user which to use
 echo "Detecting available video devices..."
