@@ -41,11 +41,11 @@ echo "Found: $BUSID at $SYSDEV"
 # Get driver
 DRIVER=$(basename "$(readlink -f "$SYSDEV/driver" 2>/dev/null || echo '')")
 if [ -z "$DRIVER" ]; then
-  echo "No driver bound. Trying authorize toggle..."
+  echo "No driver bound. Trying authorise toggle..."
   echo 0 | sudo tee "$SYSDEV/authorized" >/dev/null
   sleep 1
   echo 1 | sudo tee "$SYSDEV/authorized" >/dev/null
-  echo "Authorization toggled"
+  echo "Authorisation toggled"
 else
   echo "Unbinding $DRIVER..."
   echo "$BUSID" | sudo tee "$SYSDEV/driver/unbind" >/dev/null

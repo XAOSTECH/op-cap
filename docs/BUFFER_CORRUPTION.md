@@ -257,7 +257,7 @@ ffmpeg -f v4l2 -video_size <WIDTH>x<HEIGHT> -framerate <FPS> -i /dev/video0 -t 5
 # Example: 4K@30fps
 ffmpeg -f v4l2 -video_size 3840x2160 -framerate 30 -i /dev/video0 -t 5 -f rawvideo out.raw 2>&1 | tee capture.log
 
-# Analyze corruption patterns
+# Analyse corruption patterns
 grep -i "corrupted" capture.log | head -20
 
 # Check frame size (should be WIDTH*HEIGHT*1.5 bytes for NV12)
