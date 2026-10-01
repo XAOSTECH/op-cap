@@ -10,7 +10,7 @@ Stabilise high-throughput USB capture devices for OBS on Linux. Provides auto-re
 - **Auto-reconnect** — Monitors device and restarts feed on disconnect
 - **USB reset & driver rebind** — Recovers from device hangs without reboot
 - **Performance optimisations** — Disables USB autosuspend, optimises power settings
-- **HDR passthrough** — Configurable color handling modes
+- **HDR passthrough** — Configurable colour handling modes
 - **Optional overlay** — Add logo/watermark from URL or file
 - **Format auto-detection** — Detects best resolution/fps during install
 - **Wayland graphics optimisation** — Fixes OBS crashes on Wayland with explicit sync and PipeWire support
@@ -66,14 +66,14 @@ A comprehensive interactive maintenance system is available for troubleshooting 
 sudo ./scripts/maintenance.sh
 ```
 
-This menu provides access to 9 specialized recovery tools:
+This menu provides access to 9 specialised recovery tools:
 
 | Tool | Description | Use When |
 |------|-------------|----------|
 | **detect_device** | Enumerate USB video devices | Device not found or caps unclear |
 | **disable_overlay** | Remove on-screen logos/OSD | Capture has unwanted watermarks |
 | **hard_reset** | Unbind/rebind USB driver | Device unresponsive but enumerated |
-| **optimise_device** | Disable autosuspend, optimize power | Timeouts, USB power errors |
+| **optimise_device** | Disable autosuspend, optimise power | Timeouts, USB power errors |
 | **pick_delogo** | Visually select logo region | Need to identify overlay position |
 | **repair** | Full recovery workflow | Device broken, try complete reset |
 | **simulate_disconnect** | Test device authority toggle | Testing/diagnostics only |
@@ -124,7 +124,7 @@ For detailed buffer corruption diagnosis, see **[BUFFER_CORRUPTION.md](BUFFER_CO
 |--------|---------|
 | [`install.sh`](../scripts/install.sh) | Interactive setup: detect device, install services, v4l2loopback |
 | [`validate_capture.sh`](../scripts/validate_capture.sh) | Test device for corruption, timeouts, USB power issues |
-| [`optimise_device.sh`](../scripts/optimise_device.sh) | Disable autosuspend, optimize USB power for device |
+| [`optimise_device.sh`](../scripts/optimise_device.sh) | Disable autosuspend, optimise USB power for device |
 | [`optimise_drivers.sh`](../scripts/optimise_drivers.sh) | Fix OBS Wayland crashes (Nvidia/AMD/Intel) |
 | [`auto_reconnect.sh`](../scripts/auto_reconnect.sh) | Monitor device, auto-restart on disconnect |
 | [`parse_formats.sh`](../scripts/parse_formats.sh) | Auto-detect best resolution/fps from device |
@@ -156,21 +156,21 @@ All settings in `/etc/default/usb-capture`:
 
 ### HDR Modes
 
-| Mode | Behavior |
+| Mode | Behaviour |
 |------|----------|
 | `0` | Auto — trust device (may delay startup) |
 | `1` | Force HDR interpretation + tonemap to SDR |
 | `2` | Force HDR passthrough (fastest startup) **← default** |
 | `3` | Force SDR interpretation |
 
-Most devices auto-handle HDR internally. Mode 2 provides fastest startup without color issues.
+Most devices auto-handle HDR internally. Mode 2 provides fastest startup without colour issues.
 
 ## OBS Setup
 
 ### Standard Setup
 
 1. Add **Video Capture Device** source
-2. Select `/dev/video10` (labeled "USB_Capture_Loop")
+2. Select `/dev/video10` (labelled "USB_Capture_Loop")
 3. Resolution/FPS auto-detected
 
 If device not visible:
@@ -325,7 +325,7 @@ nvidia-smi  # Check current version
 sudo ./scripts/optimise_drivers.sh --amd
 ```
 
-Ensures AMDGPU driver is optimised for Wayland, enables color block compression.
+Ensures AMDGPU driver is optimised for Wayland, enables colour block compression.
 
 ### Intel GPU
 
@@ -428,7 +428,7 @@ lsusb
 sudo nano /etc/udev/rules.d/99-usb-capture-optimisation.rules
 ```
 
-Add the rule (customize VID:PID for your device):
+Add the rule (customise VID:PID for your device):
 ```udev
 ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="3188", ATTR{idProduct}=="1000", ATTR{power/control}="on", ATTR{power/autosuspend_delay_ms}="-1"
 ```

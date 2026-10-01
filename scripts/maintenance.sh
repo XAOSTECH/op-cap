@@ -9,7 +9,7 @@ set -euo pipefail
 BASEDIR="$(cd "$(dirname "$0")" && pwd)"
 MAINTENANCE_DIR="$BASEDIR/maintenance"
 
-# Colors
+# Colours
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -109,7 +109,7 @@ resolve_usb_bus() {
     return 1
   fi
   
-  # If it's VID:PID, find the device (search both authorized and unauthorized)
+  # If it's VID:PID, find the device (search both authorised and unauthorized)
   if [[ "$input" =~ ^[0-9a-fA-F]{4}:[0-9a-fA-F]{4}$ ]]; then
     local vid=$(echo "$input" | cut -d: -f1)
     local pid=$(echo "$input" | cut -d: -f2)
@@ -161,7 +161,7 @@ build_menu() {
   
   # Add special hub control entries (reuse usb_reset script)
   SCRIPTS+=("usb_reset" "usb_reset" "usb_reset")
-  DESCRIPTIONS+=("Disable USB hub/device (force disconnect)" "Enable USB hub/device (force reconnect)" "Authorize device (enable after boot block)")
+  DESCRIPTIONS+=("Disable USB hub/device (force disconnect)" "Enable USB hub/device (force reconnect)" "Authorise device (enable after boot block)")
   ARG_TYPES+=("hub_disable" "hub_enable" "hub_authorize")
   
   if [ ${#SCRIPTS[@]} -eq 0 ]; then
@@ -407,7 +407,7 @@ run_maintenance_script() {
         if [ $retry_count -eq 0 ]; then
           detect_devices
           echo
-          warn "Authorize device that was kept disabled on boot via udev rule."
+          warn "Authorise device that was kept disabled on boot via udev rule."
           warn "Use this to enable the device when ready to use in OBS."
           echo
           warn "You can enter:"
@@ -440,7 +440,7 @@ run_maintenance_script() {
       done
       
       if [ "$success" = false ]; then
-        error "Failed to authorize device"
+        error "Failed to authorise device"
         return 1
       fi
       ;;

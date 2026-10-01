@@ -148,7 +148,7 @@ optimise_amd() {
 # OBS Wayland optimisation for AMD
 # AMDGPU driver optimisations for stable screen capture and PipeWire integration
 
-# Enable AMD color block compression for better performance
+# Enable AMD colour block compression for better performance
 export RADEON_ENABLE_ACE=1
 
 # Wayland-specific optimisations

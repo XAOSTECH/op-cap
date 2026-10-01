@@ -239,7 +239,7 @@ source ~/.bashrc
 cd /home/jnxlr/PRO/WEB/CST/op-cap
 make install-safe-launcher
 
-# 3. Run driver optimization (creates wrapper)
+# 3. Run driver optimisation (creates wrapper)
 sudo make optimise-drivers
 
 # 4. Disable autosuspend

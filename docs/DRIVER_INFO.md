@@ -38,7 +38,7 @@ The Windows driver (uvclower.sys) is a UVC **lower filter** that adds vendor-spe
 **Platform Support:**
 - Windows x86 (32-bit): `x86/uvclower.sys`
 - Windows x64 (64-bit): `x64/uvclower.sys`
-- Catalog: `uvclower.cat`
+- Catalogue: `uvclower.cat`
 
 **Driver Functions:**
 - UVC filter for video capture
@@ -53,7 +53,7 @@ Based on the official driver configuration:
 ### Video Interfaces
 - **HDMI Input**: 1x HDMICapture device
 - **UVC Compliance**: Full UVC 1.0+ compliance
-- **Color Spaces**: 
+- **Colour Spaces**: 
   - YUV 4:2:0 (NV12, YU12) - Standard 8-bit
   - **P010** (10-bit HDR) - Native 10-bit format support
 - **Max Resolution**: 4K UHD (3840x2160)
@@ -65,7 +65,7 @@ Based on the official driver configuration:
 - **USB Speed**: USB 3.0 / USB 3.1
 - **Interface Type**: USB Video Class (UVC)
 
-## Optimization for Linux
+## Optimisation for Linux
 
 ### v4l2-ctl Device Information
 
@@ -132,7 +132,7 @@ Based on the official driver specifications:
 Video Resolution: 3840x2160 (4K)
 Framerate: 30 fps (stable)
 Pixel Format: YU12 (Planar YUV 4:2:0)
-Color Space: Rec.709 / BT.709
+Colour Space: Rec.709 / BT.709
 
 # Alternative (lower resource)
 Video Resolution: 1920x1080 (Full HD)
@@ -163,7 +163,7 @@ The device is detected by:
    - Creates /dev/videoX nodes
 
 3. **v4l2 framework**:
-   - Provides standardized API
+   - Provides standardised API
    - Supports hardware acceleration (if available)
 
 ## Stability Tips for Linux
@@ -241,7 +241,7 @@ The P010 v4l2 support patches and prebuilt kernels are maintained by Alexander W
 
 - **Driver Source**: [Build.0.15.12](https://www.mediafire.com/file/41l9pmpp2wqn6ks/25173+Build.0.15.12.zip/file)
 - **P010 Kernel Patches**: [P010_for_V4L2 (workspace root)](../../../P010_for_V4L2)
-- **Linux Optimization**: [WAYLAND_OPTIMISATION.md](WAYLAND_OPTIMISATION.md)
+- **Linux Optimisation**: [WAYLAND_OPTIMISATION.md](WAYLAND_OPTIMISATION.md)
 - **Buffer Troubleshooting**: [BUFFER_CORRUPTION.md](BUFFER_CORRUPTION.md)
 - **Safe Launcher**: [scripts/obs-safe-launch.sh](../scripts/obs-safe-launch.sh)
 

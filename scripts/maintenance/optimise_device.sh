@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Optimize USB capture device for maximum performance and stability
+# Optimise USB capture device for maximum performance and stability
 # Usage: sudo ./optimize_device.sh [VID:PID]
-MAINTENANCE_DESC="Disable autosuspend, optimize USB power"
+MAINTENANCE_DESC="Disable autosuspend, optimise USB power"
 MAINTENANCE_ARGS="vidpid"
 
 set -euo pipefail
@@ -62,7 +62,7 @@ if [ -f "$SYSDEV/power/level" ]; then
   echo "  [OK] Set power/level = on"
 fi
 
-# 3. Maximize USB bandwidth allocation (for xHCI)
+# 3. Maximise USB bandwidth allocation (for xHCI)
 # Find the USB controller for this device
 CONTROLLER=$(readlink -f "$SYSDEV" | grep -oE 'usb[0-9]+' | head -1)
 if [ -n "$CONTROLLER" ] && [ -d "/sys/bus/usb/devices/$CONTROLLER" ]; then
@@ -94,7 +94,7 @@ echo "Device info:"
 [ -f "$SYSDEV/manufacturer" ] && echo "  Manufacturer: $(cat $SYSDEV/manufacturer)"
 [ -f "$SYSDEV/bcdUSB" ] && echo "  USB Version: $(cat $SYSDEV/bcdUSB)"
 
-# 7. System-wide USB optimizations
+# 7. System-wide USB optimisations
 echo ""
 echo "Applying system-wide USB optimizations..."
 
@@ -109,7 +109,7 @@ if [ -f /sys/module/usbcore/parameters/autosuspend ]; then
   fi
 fi
 
-# 8. UVC driver optimizations
+# 8. UVC driver optimisations
 if [ -d /sys/module/uvcvideo/parameters ]; then
   # Increase buffer count for smoother capture
   if [ -f /sys/module/uvcvideo/parameters/quirks ]; then
@@ -123,7 +123,7 @@ if [ -d /sys/module/uvcvideo/parameters ]; then
 fi
 
 echo ""
-echo "Optimization complete!"
+echo "Optimisation complete!"
 echo ""
 echo "To make autosuspend changes persistent, add udev rule:"
 echo "  ACTION==\"add\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"$VID\", ATTR{idProduct}==\"$PID\", ATTR{power/control}=\"on\""
