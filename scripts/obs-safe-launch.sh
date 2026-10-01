@@ -411,9 +411,16 @@ start_auto_reconnect() {
     return 0
   fi
 
-  # In no-loopback mode the wrapper crash-recovery loop handles restarts directly
+  # In no-loopback mode, run auto_reconnect for USB reset/rebind and kill OBS on reconnect
   if [ "$USE_LOOPBACK" -eq 0 ]; then
-    log_info "Skipping auto-reconnect (direct-device mode: crash recovery handles restarts)"
+    log_info "Starting device reconnect monitor for $DEVICE (direct-device mode)..."
+    sudo bash "$BASEDIR/scripts/auto_reconnect.sh" \
+      --device "$DEVICE" \
+      ${VIDPID:+--vidpid "$VIDPID"} \
+      --restart-obs \
+      &>> "$LOG_FILE" &
+    echo $! > "$PID_FILE"
+    log_ok "Device reconnect monitor started (PID: $(cat "$PID_FILE"))"
     return 0
   fi
 

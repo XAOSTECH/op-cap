@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Monitor a v4l2 capture device; on disconnect, try to reset and rebind the USB device and restart FFmpeg loop.
-# Usage: sudo ./auto_reconnect.sh --vidpid 1a2b:3344 --device /dev/video0 --feed-service usb-capture-ffmpeg.service
+# Monitor a v4l2 capture device; on disconnect, reset and rebind USB, then restart the FFmpeg service or OBS.
+# Usage: sudo ./auto_reconnect.sh --vidpid 1a2b:3344 --device /dev/video0 [--feed-service svc] [--restart-obs]
 
 set -euo pipefail
 
 VIDPID=""
 DEVNODE="/dev/video0"
 FFMPEG_SERVICE="usb-capture-ffmpeg.service"
+RESTART_OBS=0
 CHECK_INTERVAL=2
 RESET_COUNT=0
 MAX_RESET_ATTEMPTS=3
@@ -19,6 +20,8 @@ while (( "$#" )); do
       DEVNODE="$2"; shift 2;;
     --ffmpeg-service)
       FFMPEG_SERVICE="$2"; shift 2;;
+    --restart-obs)
+      RESTART_OBS=1; shift;;
     *) echo "Unknown option $1"; exit 2;;
   esac
 done
@@ -39,7 +42,7 @@ while true; do
   else
     echo "$(date) - Device $DEVNODE is gone. Attempting to restart."
     # try graceful restart: restart ffmpeg service and re-detect
-    if systemctl is-active --quiet "$FFMPEG_SERVICE"; then
+    if [ "$RESTART_OBS" -eq 0 ] && systemctl is-active --quiet "$FFMPEG_SERVICE"; then
       echo "Stopping $FFMPEG_SERVICE"
       systemctl stop "$FFMPEG_SERVICE" || true
     fi
@@ -84,8 +87,18 @@ while true; do
       RESET_COUNT=0
     fi
 
-    # Try starting FFmpeg feed again
-    if [ -f "$(dirname "$0")/../ffmpeg/feed.sh" ]; then
+    # Restart the capture pipeline
+    if [ "$RESTART_OBS" -eq 1 ]; then
+      # Wait for the device to reappear (up to 30s) then kill OBS so the wrapper restarts it
+      _w=0
+      while ! [ -c "$DEVNODE" ] && [ "$_w" -lt 30 ]; do sleep 1; _w=$((_w+1)); done
+      if [ -c "$DEVNODE" ]; then
+        echo "Device $DEVNODE back after reset. Signalling OBS to restart..."
+        pkill -TERM -f 'obs.*--safe-mode' 2>/dev/null || true
+      else
+        echo "Device $DEVNODE did not reappear within 30s after reset."
+      fi
+    elif [ -f "$(dirname "$0")/../ffmpeg/feed.sh" ]; then
       echo "Starting feed ($FFMPEG_SERVICE)"
       systemctl start "$FFMPEG_SERVICE" || bash "$(dirname "$0")/../ffmpeg/feed.sh" &
     fi
