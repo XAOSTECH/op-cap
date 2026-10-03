@@ -26,14 +26,23 @@ while (( "$#" )); do
   esac
 done
 
-if [ -z "$VIDPID" ]; then
-  echo "Warning: VID:PID not provided; using device to watch only ($DEVNODE)" >&2
+# Derive VIDPID from udevadm if not provided (needed for USB reset)
+if [ -z "$VIDPID" ] && [ -c "$DEVNODE" ]; then
+  _v=$(udevadm info -q property -n "$DEVNODE" 2>/dev/null | awk -F= '/^ID_VENDOR_ID=/{print $2;exit}')
+  _p=$(udevadm info -q property -n "$DEVNODE" 2>/dev/null | awk -F= '/^ID_MODEL_ID=/{print $2;exit}')
+  [ -n "$_v" ] && [ -n "$_p" ] && VIDPID="${_v}:${_p}" && echo "Derived VID:PID from device: $VIDPID" >&2
 fi
 
-echo "Watching $DEVNODE for connection (VIDPID=$VIDPID) -- will try $MAX_RESET_ATTEMPTS resets if it goes down"
+if [ -z "$VIDPID" ]; then
+  echo "Warning: VID:PID not available; USB reset will be skipped ($DEVNODE)" >&2
+fi
+
+echo "Watching $DEVNODE (VIDPID=${VIDPID:-none}) -- will try $MAX_RESET_ATTEMPTS resets if it goes down"
 
 while true; do
-  if [ -c "$DEVNODE" ]; then
+  # Use sysfs to detect real kernel-level disconnect; /dev/videoN persists on driver-only failures
+  _devname=$(basename "$DEVNODE")
+  if [ -d "/sys/class/video4linux/$_devname" ]; then
     # OK; reset counter
     if [ "$RESET_COUNT" -ne 0 ]; then
       echo "Device returned. Reset count reset"
@@ -91,13 +100,10 @@ while true; do
     if [ "$RESTART_OBS" -eq 1 ]; then
       # Wait for the device to reappear (up to 30s) then kill OBS so the wrapper restarts it
       _w=0
-      while ! [ -c "$DEVNODE" ] && [ "$_w" -lt 30 ]; do sleep 1; _w=$((_w+1)); done
-      if [ -c "$DEVNODE" ]; then
-        echo "Device $DEVNODE back after reset. Signalling OBS to restart..."
-        pkill -TERM -f 'obs.*--safe-mode' 2>/dev/null || true
-      else
-        echo "Device $DEVNODE did not reappear within 30s after reset."
-      fi
+      while ! [ -d "/sys/class/video4linux/$_devname" ] && [ "$_w" -lt 30 ]; do sleep 1; _w=$((_w+1)); done
+      # Kill OBS regardless - if device came back OBS restarts cleanly; if not, restart loop retries
+      echo "Signalling OBS to restart (device ${DEVNODE} $([ -d /sys/class/video4linux/$_devname ] && echo 'back' || echo 'still absent'))..."
+      pkill -TERM -f 'obs.*--safe-mode' 2>/dev/null || pkill -TERM obs 2>/dev/null || true
     elif [ -f "$(dirname "$0")/../ffmpeg/feed.sh" ]; then
       echo "Starting feed ($FFMPEG_SERVICE)"
       systemctl start "$FFMPEG_SERVICE" || bash "$(dirname "$0")/../ffmpeg/feed.sh" &

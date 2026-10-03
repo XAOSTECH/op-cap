@@ -36,6 +36,8 @@ CAP_RES="${USB_CAPTURE_RES:-3840x2160}"
 CAP_FPS="${USB_CAPTURE_FPS:-30}"
 CAP_FMT="${USB_CAPTURE_FORMAT:-NV12}"
 HDR_MODE="${USB_CAPTURE_HDR_MODE:-2}"
+# Fall back to env file VIDPID if not supplied on the command line
+: "${VIDPID:=${USB_CAPTURE_VIDPID:-}}"
 USE_LOOPBACK=1
 ISOLATED_CONFIG_DIR=""
 NO_V4L2_SHIM_DIR=""
@@ -897,18 +899,10 @@ main() {
       # Patch scene to the physical device so OBS does not open the loopback
       local _obs_scenes="${HOME}/.config/obs-studio/basic/scenes"
       if command -v jq >/dev/null 2>&1 && [ -d "$_obs_scenes" ]; then
-        # Map stored format name to V4L2 FourCC so OBS uses the best detected format
-        local _pf=0
-        case "${USB_CAPTURE_FORMAT:-}" in
-          MJPG) _pf=1196444237 ;;
-          NV12) _pf=842094158  ;;
-          YUYV) _pf=1448695129 ;;
-          YU12) _pf=842093913  ;;
-        esac
         for _fp in "$_obs_scenes"/*.json; do
           [ -f "$_fp" ] || continue
-          jq --arg dev "$DEVICE" --argjson pf "$_pf" \
-            '.sources |= map(if .id == "v4l2_input" and ((.settings.device_id // "") | startswith("/dev/")) and .settings.device_id != $dev then .settings.device_id = $dev | .settings.pixelformat = $pf else . end)' \
+          jq --arg dev "$DEVICE" \
+            '.sources |= map(if .id == "v4l2_input" and ((.settings.device_id // "") | startswith("/dev/")) and .settings.device_id != $dev then .settings.device_id = $dev | .settings.pixelformat = 0 else . end)' \
             "$_fp" > "${_fp}.tmp" 2>/dev/null && mv "${_fp}.tmp" "$_fp" || rm -f "${_fp}.tmp"
         done
       fi
