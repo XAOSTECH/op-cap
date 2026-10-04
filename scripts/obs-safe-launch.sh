@@ -915,6 +915,15 @@ main() {
   else
     log_info "Device monitoring disabled (--no-device): OBS is protected from crash-restart loops only"
   fi
+
+  # Watch OBS output for capture-source loss and kill OBS to trigger a crash-recovery restart
+  ( tail -n 0 -F "$LOG_FILE" 2>/dev/null | \
+    grep --line-buffered "Stopped capture after" | \
+    while IFS= read -r _; do
+      pkill -TERM -f 'obs.*--safe-mode' 2>/dev/null || pkill -TERM obs 2>/dev/null || true
+      sleep 8  # stay quiet while OBS restarts
+    done ) &
+  echo $! >> "$PID_FILE"
   echo ""
 
   # Main loop: launch OBS, restart on crash
