@@ -916,12 +916,17 @@ main() {
     log_info "Device monitoring disabled (--no-device): OBS is protected from crash-restart loops only"
   fi
 
-  # Watch OBS output for capture-source loss and kill OBS to trigger a crash-recovery restart
+  # Watch OBS output for capture-source loss and kill OBS to trigger a crash-recovery restart.
+  # Threshold: ignore stops < 1000 frames (device settings changes take only a few frames).
+  local _sentinel="/tmp/obs-safe-launch-capture-restart"
   ( tail -n 0 -F "$LOG_FILE" 2>/dev/null | \
     grep --line-buffered "Stopped capture after" | \
-    while IFS= read -r _; do
+    while IFS= read -r _line; do
+      _n=$(echo "$_line" | grep -oE '[0-9]+' | tail -1)
+      [ "${_n:-0}" -lt 1000 ] && continue
+      touch "$_sentinel"
       pkill -TERM -f 'obs.*--safe-mode' 2>/dev/null || pkill -TERM obs 2>/dev/null || true
-      sleep 8  # stay quiet while OBS restarts
+      sleep 8
     done ) &
   echo $! >> "$PID_FILE"
   echo ""
@@ -936,7 +941,13 @@ main() {
     set -e  # Re-enable exit-on-error
     
     log_info "OBS exited with code: $EXIT_CODE"
-    
+
+    # Treat capture-source-loss kills (exit 0 via SIGTERM) the same as crashes
+    if [ -f "$_sentinel" ]; then
+      rm -f "$_sentinel"
+      EXIT_CODE=1
+    fi
+
     if [ $EXIT_CODE -eq 0 ]; then
       log_info "OBS exited normally"
       break
@@ -988,7 +999,7 @@ cleanup() {
   if [ -n "${NO_V4L2_SHIM_DIR:-}" ] && [ -d "$NO_V4L2_SHIM_DIR" ]; then
     rm -rf "$NO_V4L2_SHIM_DIR" || true
   fi
-  rm -f "$PID_FILE" "$STREAM_STATE_FILE" "$AUDIO_ROUTER_PID_FILE"
+  rm -f "$PID_FILE" "$STREAM_STATE_FILE" "$AUDIO_ROUTER_PID_FILE" "/tmp/obs-safe-launch-capture-restart"
   log_info "Shutdown complete"
 }
 
