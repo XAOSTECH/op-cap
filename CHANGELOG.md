@@ -1,4 +1,17 @@
 
+## [0.1.2] - 2026-10-05
+
+### Fixed
+- threshold and proper restart on capture loss
+- kill and restart OBS on capture source loss
+- reliable disconnect detection and USB reset
+- use stored best format FourCC in --no-loopback scene patch
+- auto-install all required packages, never prompt the user
+- handle reconnects in --no-loopback mode
+
+### Changed
+- Merge pull request #2 from XAOSTECH:anglicise/20261001-034544
+
 ## [0.1.1] - 2026-09-28
 
 ### Added
