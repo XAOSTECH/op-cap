@@ -729,14 +729,15 @@ run_obs() {
 
 # Check if OBS was streaming via websocket or log file
 detect_streaming_state() {
-  # Check recent log for streaming indicators
-  if [ ! -f "$LOG_FILE" ]; then
-    log_info "Log file doesn't exist yet: $LOG_FILE"
-    return 1
+  # Real-time state file written by the log watcher takes priority over log scanning
+  if [ -f "$STREAM_STATE_FILE" ]; then
+    log_info "Detected active stream (stream state file)"
+    return 0
   fi
-  
-  if tail -100 "$LOG_FILE" 2>/dev/null | grep -q "==== Streaming Start"; then
-    log_info "Detected active stream (found 'Streaming Start' in log)"
+  # Fall back to full log scan (handles cases where watcher wasn't running)
+  if [ -f "$LOG_FILE" ] && grep -q "==== Streaming Start" "$LOG_FILE" 2>/dev/null && \
+     ! grep -q "User stopped the stream" "$LOG_FILE" 2>/dev/null; then
+    log_info "Detected active stream (log scan)"
     echo "1" > "$STREAM_STATE_FILE"
     return 0
   fi
@@ -916,17 +917,29 @@ main() {
     log_info "Device monitoring disabled (--no-device): OBS is protected from crash-restart loops only"
   fi
 
-  # Watch OBS output for capture-source loss and kill OBS to trigger a crash-recovery restart.
+  # Watch OBS output for streaming state and capture-source loss.
+  # Maintains STREAM_STATE_FILE in real-time so detect_streaming_state works after long sessions.
   # Threshold: ignore stops < 1000 frames (device settings changes take only a few frames).
   local _sentinel="/tmp/obs-safe-launch-capture-restart"
   ( tail -n 0 -F "$LOG_FILE" 2>/dev/null | \
-    grep --line-buffered "Stopped capture after" | \
+    grep --line-buffered -E "Stopped capture after|==== Streaming Start|User stopped the stream" | \
     while IFS= read -r _line; do
-      _n=$(echo "$_line" | grep -oE '[0-9]+' | tail -1)
-      [ "${_n:-0}" -lt 1000 ] && continue
-      touch "$_sentinel"
-      pkill -TERM -f 'obs.*--safe-mode' 2>/dev/null || pkill -TERM obs 2>/dev/null || true
-      sleep 8
+      case "$_line" in
+        *"==== Streaming Start"*)
+          echo 1 > "$STREAM_STATE_FILE" ;;
+        *"User stopped the stream"*)
+          rm -f "$STREAM_STATE_FILE" ;;
+        *"Stopped capture after"*)
+          _n=$(echo "$_line" | grep -oE '[0-9]+' | tail -1)
+          [ "${_n:-0}" -lt 1000 ] && continue
+          touch "$_sentinel"
+          pkill -TERM -f 'obs.*--safe-mode' 2>/dev/null || pkill -TERM obs 2>/dev/null || true
+          sleep 5
+          # Force-kill if streaming confirm dialog blocked SIGTERM
+          pkill -KILL -f 'obs.*--safe-mode' 2>/dev/null || pkill -KILL obs 2>/dev/null || true
+          sleep 5
+          ;;
+      esac
     done ) &
   echo $! >> "$PID_FILE"
   echo ""
