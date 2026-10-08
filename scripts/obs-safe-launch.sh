@@ -934,10 +934,7 @@ main() {
           [ "${_n:-0}" -lt 1000 ] && continue
           touch "$_sentinel"
           pkill -TERM -f 'obs.*--safe-mode' 2>/dev/null || pkill -TERM obs 2>/dev/null || true
-          sleep 5
-          # Force-kill if streaming confirm dialog blocked SIGTERM
-          pkill -KILL -f 'obs.*--safe-mode' 2>/dev/null || pkill -KILL obs 2>/dev/null || true
-          sleep 5
+          sleep 8
           ;;
       esac
     done ) &
