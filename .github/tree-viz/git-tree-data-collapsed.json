@@ -1,0 +1,221 @@
+{
+  "metadata": {
+    "repository": "op-cap",
+    "current_branch": "main",
+    "repo_url": "https://github.com/XAOSTECH/op-cap",
+    "generated": "2026-10-08T23:47:01Z",
+    "max_commits": 500
+  },
+  "commits": [
+    {
+      "sha": "ac254e5cfdf62f4a0421d0a491992b924f584948",
+      "short": "ac254e5",
+      "parents": "25980639c6c801c412e8ad72f8db952a4c4d86db",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-10-08T23:47:01Z",
+      "timestamp": 1791503221,
+      "subject": "fix(obs-safe-launch): remove SIGKILL fallback that was killing restarted OBS",
+      "refs": "HEAD -> main, origin/main"
+    },
+    {
+      "sha": "25980639c6c801c412e8ad72f8db952a4c4d86db",
+      "short": "2598063",
+      "parents": "4714cbcf894696ac80d9af0c85e91a5cbd8b05ca",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-10-07T20:23:44Z",
+      "timestamp": 1791404624,
+      "subject": "fix(obs-safe-launch): persist streaming state across OBS restarts; force-kill on dialog block",
+      "refs": ""
+    },
+    {
+      "sha": "4714cbcf894696ac80d9af0c85e91a5cbd8b05ca",
+      "short": "4714cbc",
+      "parents": "collapsed:c08b497839c322a819842fa2d1c8cb890db192fd:80a0c6b719e5451541537728bdd1959bdf0839c4",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-10-05T03:46:47Z",
+      "timestamp": 1791172007,
+      "subject": "chore: update CHANGELOG for v0.1.2",
+      "refs": "tag: v0.1.2, tag: latest"
+    },
+    {
+      "sha": "collapsed:c08b497839c322a819842fa2d1c8cb890db192fd:80a0c6b719e5451541537728bdd1959bdf0839c4",
+      "short": "6",
+      "parents": "ff0dd81b64935bcbaa43fe9154866c2067b3b7dd",
+      "author": "",
+      "email": "",
+      "date": "2026-10-04T21:55:33Z",
+      "timestamp": 1791150933,
+      "subject": "6 commits",
+      "refs": "",
+      "collapsed": true,
+      "count": 6
+    },
+    {
+      "sha": "ff0dd81b64935bcbaa43fe9154866c2067b3b7dd",
+      "short": "ff0dd81",
+      "parents": "66ab799ae6cc5cea193229ab4ca90800771a16fd 662088c7d5883284f85f3c448b048809a6ee8648",
+      "author": "xaostech[bot]",
+      "email": "260314499+xaostech[bot]@users.noreply.github.com",
+      "date": "2026-10-01T03:46:17Z",
+      "timestamp": 1790826377,
+      "subject": "Merge pull request #2 from XAOSTECH:anglicise/20261001-034544",
+      "refs": ""
+    },
+    {
+      "sha": "662088c7d5883284f85f3c448b048809a6ee8648",
+      "short": "662088c",
+      "parents": "66ab799ae6cc5cea193229ab4ca90800771a16fd",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-10-01T03:45:44Z",
+      "timestamp": 1790826344,
+      "subject": "chore: convert American spellings to British English",
+      "refs": ""
+    },
+    {
+      "sha": "66ab799ae6cc5cea193229ab4ca90800771a16fd",
+      "short": "66ab799",
+      "parents": "collapsed:70648d64a48fd589759b307b3056da3f2453f16c:7c9fd45e6c8fb76cb084fae39fddbca59c7db853",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-09-28T03:19:13Z",
+      "timestamp": 1790565553,
+      "subject": "chore: update CHANGELOG for v0.1.1",
+      "refs": "tag: v0.1.1"
+    },
+    {
+      "sha": "collapsed:70648d64a48fd589759b307b3056da3f2453f16c:7c9fd45e6c8fb76cb084fae39fddbca59c7db853",
+      "short": "47",
+      "parents": "2eb8025477c4e0ca581d8286ebaa875d7b760663",
+      "author": "",
+      "email": "",
+      "date": "2026-09-27T11:51:51Z",
+      "timestamp": 1790509911,
+      "subject": "47 commits",
+      "refs": "",
+      "collapsed": true,
+      "count": 47
+    },
+    {
+      "sha": "d9e24fc54832052a1fbad124bd857483cd9e94c1",
+      "short": "d9e24fc",
+      "parents": "collapsed:159f53f687e6f042f96bda39846a4040c6a63cec:5c31064d41453bdef87356c7b7e622a173093efd",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-09-14T03:05:33Z",
+      "timestamp": 1789355133,
+      "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
+      "refs": "tag: v0.1.0"
+    },
+    {
+      "sha": "collapsed:159f53f687e6f042f96bda39846a4040c6a63cec:5c31064d41453bdef87356c7b7e622a173093efd",
+      "short": "21",
+      "parents": "85cc669f1a6de5879ac15a25497d3375683a2828",
+      "author": "",
+      "email": "",
+      "date": "2026-09-07T02:35:58Z",
+      "timestamp": 1788748558,
+      "subject": "21 commits",
+      "refs": "",
+      "collapsed": true,
+      "count": 21
+    },
+    {
+      "sha": "85cc669f1a6de5879ac15a25497d3375683a2828",
+      "short": "85cc669",
+      "parents": "1ece3e53e26fa6a70712ae382f8166ae3d7d404f a825a385b61a6fefd6fd7da27ae9b21426b51d04",
+      "author": "xaostech[bot]",
+      "email": "260314499+xaostech[bot]@users.noreply.github.com",
+      "date": "2026-04-01T02:08:58Z",
+      "timestamp": 1775009338,
+      "subject": "Merge pull request #1 from XAOSTECH:anglicise/20260401-020828",
+      "refs": ""
+    },
+    {
+      "sha": "a825a385b61a6fefd6fd7da27ae9b21426b51d04",
+      "short": "a825a38",
+      "parents": "1ece3e53e26fa6a70712ae382f8166ae3d7d404f",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-04-01T02:08:28Z",
+      "timestamp": 1775009308,
+      "subject": "chore: convert American spellings to British English",
+      "refs": ""
+    },
+    {
+      "sha": "1ece3e53e26fa6a70712ae382f8166ae3d7d404f",
+      "short": "1ece3e5",
+      "parents": "2eb8025477c4e0ca581d8286ebaa875d7b760663",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-03-30T02:05:52Z",
+      "timestamp": 1774836352,
+      "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
+      "refs": ""
+    },
+    {
+      "sha": "2eb8025477c4e0ca581d8286ebaa875d7b760663",
+      "short": "2eb8025",
+      "parents": "collapsed:41d04d457a879d62ba04b5ef9d1632911997ba22:ff9c653882741f4ed224c6ffe163116df5de8647",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-23T17:55:09+01:00",
+      "timestamp": 1774284909,
+      "subject": "chore(dc-init): load workflows,actions",
+      "refs": ""
+    },
+    {
+      "sha": "collapsed:41d04d457a879d62ba04b5ef9d1632911997ba22:ff9c653882741f4ed224c6ffe163116df5de8647",
+      "short": "30",
+      "parents": "49587641871678e2b481deecc9b4473143cc4f96",
+      "author": "",
+      "email": "",
+      "date": "2026-03-15T07:51:54+01:00",
+      "timestamp": 1773557514,
+      "subject": "30 commits",
+      "refs": "",
+      "collapsed": true,
+      "count": 30
+    },
+    {
+      "sha": "49587641871678e2b481deecc9b4473143cc4f96",
+      "short": "4958764",
+      "parents": "",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2025-12-10T13:08:04+01:00",
+      "timestamp": 1765368484,
+      "subject": "Init",
+      "refs": ""
+    }
+  ],
+  "branches": [
+    {
+      "name": "ac254e5cfdf62f4a0421d0a491992b924f584948 fix(obs-safe-launch): remove SIGKILL fallback that was killing restarted OBS",
+      "sha": "*",
+      "current": false,
+      "merged": false
+    }
+  ],
+  "tags": [
+    {
+      "name": "latest",
+      "sha": "1ed8ce23670706aa884cb2c90ecca9c5f5f2fd09"
+    },
+    {
+      "name": "v0.1.0",
+      "sha": "6858480c71b44872a657d4789a26a1c393469d84"
+    },
+    {
+      "name": "v0.1.1",
+      "sha": "287785ef754ca34f752afbb7977e28cd5995baa1"
+    },
+    {
+      "name": "v0.1.2",
+      "sha": "3a88f9129d5750c37403b79ddc36648c125d6181"
+    }
+  ]
+}

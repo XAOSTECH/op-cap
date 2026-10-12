@@ -539,3 +539,13 @@ For Intel GPU:
 ```bash
 sudo apt install intel-media-driver libva-intel-driver
 ```
+
+<!-- TREE-VIZ-START -->
+
+## Git Tree Visualisation
+
+![Git Tree Visualisation](../.github/tree-viz/git-tree-mini.svg)
+
+[Full SVG](../.github/tree-viz/git-tree.svg) · [Interactive version](../.github/tree-viz/git-tree.html) · [View data](../.github/tree-viz/git-tree-data.json)
+
+<!-- TREE-VIZ-END -->

@@ -1,0 +1,3067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git Tree Visualisation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(160deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #e0e0e0;
+        }
+
+        .container {
+            background: rgba(15, 15, 35, 0.85);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(100, 60, 200, 0.15);
+            padding: 30px;
+            max-width: 95vw;
+            width: 100%;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(100, 100, 200, 0.15);
+        }
+
+        h1 {
+            color: #c0a0ff;
+            margin-bottom: 8px;
+            font-size: 28px;
+            text-shadow: 0 0 20px rgba(160, 100, 255, 0.4);
+        }
+
+        .info {
+            color: #8888aa;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .canvas-viewport {
+            position: relative;
+            width: 100%;
+            overflow: auto;
+            border: 1px solid rgba(100, 100, 200, 0.2);
+            border-radius: 8px;
+            background: #0a0a1a;
+            max-height: 85vh;
+        }
+
+        #treeCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #tooltip {
+            position: fixed;
+            background: rgba(20, 10, 40, 0.96);
+            colour: white;
+            padding: 14px 18px;
+            border-radius: 10px;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 0 12px rgba(120, 80, 200, 0.3);
+            max-width: 420px;
+            z-index: 1000;
+            border: 1px solid rgba(140, 100, 240, 0.3);
+        }
+
+        #tooltip.visible { opacity: 1; }
+
+        .tooltip-sha {
+            color: #60a5fa;
+            font-weight: bold;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        .tooltip-msg {
+            color: #e2e8f0;
+            margin-bottom: 6px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .tooltip-author {
+            color: #a78bfa;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        .tooltip-date {
+            color: #64748b;
+            font-size: 10px;
+        }
+        .tooltip-refs {
+            color: #34d399;
+            font-size: 11px;
+            margin-top: 4px;
+            font-weight: bold;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        button {
+            padding: 8px 16px;
+            background: rgba(80, 50, 160, 0.6);
+            color: #c0b0e8;
+            border: 1px solid rgba(120, 80, 220, 0.4);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: rgba(100, 60, 200, 0.8);
+            colour: white;
+            box-shadow: 0 0 12px rgba(120, 80, 220, 0.4);
+        }
+
+        .stats {
+            margin-left: auto;
+            font-size: 12px;
+            color: #6b6b8a;
+        }
+
+        .wind-slider-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #c0b0e8;
+        }
+        .wind-slider-label input[type="range"] {
+            width: 100px;
+            accent-color: #7c3aed;
+        }
+        #windVal {
+            min-width: 3.5em;
+            text-align: right;
+            font-size: 11px;
+            color: #8888aa;
+        }
+
+        .legend {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #8888aa;
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌳 Git Tree Visualisation</h1>
+        <p class="info">Hover over leaves to see commit details · Click to highlight ancestry · Ctrl+click to open commit page · Scroll to explore</p>
+
+        <div class="canvas-viewport" id="viewport">
+            <canvas id="treeCanvas" width="3520" height="5820"></canvas>
+        </div>
+
+        <div class="controls">
+            <button onclick="toggleAnimation()">⏯ Animation</button>
+            <button onclick="toggleWind()">🌬 Wind</button>
+            <label class="wind-slider-label" title="Wind intensity">🍃 <input type="range" id="windSlider" min="0" max="500" value="100" oninput="updateWindIntensity(this.value)"><span id="windVal">100%</span></label>
+            <button onclick="resetView()">↺ Reset</button>
+            <span class="stats" id="stats"></span>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><span class="legend-dot" style="background:#4ade80"></span> Commit</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#c084fc"></span> Merge</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#fb923c"></span> Fork point</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#38bdf8"></span> Tagged</div>
+        </div>
+    </div>
+
+    <div id="tooltip">
+        <div class="tooltip-sha"></div>
+        <div class="tooltip-msg"></div>
+        <div class="tooltip-author"></div>
+        <div class="tooltip-date"></div>
+        <div class="tooltip-refs"></div>
+    </div>
+
+    <script>
+        // Embedded git data
+        const gitData =
+{
+  "metadata": {
+    "repository": "op-cap",
+    "current_branch": "main",
+    "repo_url": "https://github.com/XAOSTECH/op-cap",
+    "generated": "2026-10-08T23:47:01Z",
+    "max_commits": 500
+  },
+  "commits": [
+    {
+      "sha": "ac254e5cfdf62f4a0421d0a491992b924f584948",
+      "short": "ac254e5",
+      "parents": "25980639c6c801c412e8ad72f8db952a4c4d86db",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-10-08T23:47:01Z",
+      "timestamp": 1791503221,
+      "subject": "fix(obs-safe-launch): remove SIGKILL fallback that was killing restarted OBS",
+      "refs": "HEAD -> main, origin/main",
+      "position": {
+        "x": 600,
+        "y": 60,
+        "lane": 0,
+        "radius": 6,
+        "depth": 0,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "25980639c6c801c412e8ad72f8db952a4c4d86db",
+      "short": "2598063",
+      "parents": "4714cbcf894696ac80d9af0c85e91a5cbd8b05ca",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-10-07T20:23:44Z",
+      "timestamp": 1791404624,
+      "subject": "fix(obs-safe-launch): persist streaming state across OBS restarts; force-kill on dialog block",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 100,
+        "lane": 0,
+        "radius": 6,
+        "depth": 1,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "4714cbcf894696ac80d9af0c85e91a5cbd8b05ca",
+      "short": "4714cbc",
+      "parents": "c08b497839c322a819842fa2d1c8cb890db192fd",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-10-05T03:46:47Z",
+      "timestamp": 1791172007,
+      "subject": "chore: update CHANGELOG for v0.1.2",
+      "refs": "tag: v0.1.2, tag: latest",
+      "position": {
+        "x": 600,
+        "y": 140,
+        "lane": 0,
+        "radius": 6,
+        "depth": 2,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c08b497839c322a819842fa2d1c8cb890db192fd",
+      "short": "c08b497",
+      "parents": "d279e25ddf1bb6b065ad81ed6ee32b9fe0ff642c",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-10-04T21:55:33Z",
+      "timestamp": 1791150933,
+      "subject": "fix(obs-safe-launch): threshold and proper restart on capture loss",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 180,
+        "lane": 0,
+        "radius": 6,
+        "depth": 3,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "d279e25ddf1bb6b065ad81ed6ee32b9fe0ff642c",
+      "short": "d279e25",
+      "parents": "8dbbbc56af17c06887bd8cbc68210fd391b221c6",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-10-04T21:35:13Z",
+      "timestamp": 1791149713,
+      "subject": "fix(obs-safe-launch): kill and restart OBS on capture source loss",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 220,
+        "lane": 0,
+        "radius": 6,
+        "depth": 4,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "8dbbbc56af17c06887bd8cbc68210fd391b221c6",
+      "short": "8dbbbc5",
+      "parents": "53de9579027cf96e19540937ea83d0790cae93fb",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-10-03T01:43:50Z",
+      "timestamp": 1790991830,
+      "subject": "fix(auto_reconnect,obs-safe-launch): reliable disconnect detection and USB reset",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 260,
+        "lane": 0,
+        "radius": 6,
+        "depth": 5,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "53de9579027cf96e19540937ea83d0790cae93fb",
+      "short": "53de957",
+      "parents": "550d848fe2348a767f021411a9e223c724535fdd",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-10-01T19:47:15Z",
+      "timestamp": 1790884035,
+      "subject": "fix(obs-safe-launch): use stored best format FourCC in --no-loopback scene patch",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 300,
+        "lane": 0,
+        "radius": 6,
+        "depth": 6,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "550d848fe2348a767f021411a9e223c724535fdd",
+      "short": "550d848",
+      "parents": "80a0c6b719e5451541537728bdd1959bdf0839c4",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-10-01T19:36:08Z",
+      "timestamp": 1790883368,
+      "subject": "fix(install,Makefile): auto-install all required packages, never prompt the user",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 340,
+        "lane": 0,
+        "radius": 6,
+        "depth": 7,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "80a0c6b719e5451541537728bdd1959bdf0839c4",
+      "short": "80a0c6b",
+      "parents": "ff0dd81b64935bcbaa43fe9154866c2067b3b7dd",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-10-01T19:09:24Z",
+      "timestamp": 1790881764,
+      "subject": "fix(auto_reconnect,obs-safe-launch): handle reconnects in --no-loopback mode",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 380,
+        "lane": 0,
+        "radius": 6,
+        "depth": 8,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "ff0dd81b64935bcbaa43fe9154866c2067b3b7dd",
+      "short": "ff0dd81",
+      "parents": "66ab799ae6cc5cea193229ab4ca90800771a16fd 662088c7d5883284f85f3c448b048809a6ee8648",
+      "author": "xaostech[bot]",
+      "email": "260314499+xaostech[bot]@users.noreply.github.com",
+      "date": "2026-10-01T03:46:17Z",
+      "timestamp": 1790826377,
+      "subject": "Merge pull request #2 from XAOSTECH:anglicise/20261001-034544",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 420,
+        "lane": 0,
+        "radius": 10,
+        "depth": 9,
+        "is_trunk": true,
+        "is_merge": true,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "662088c7d5883284f85f3c448b048809a6ee8648",
+      "short": "662088c",
+      "parents": "66ab799ae6cc5cea193229ab4ca90800771a16fd",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-10-01T03:45:44Z",
+      "timestamp": 1790826344,
+      "subject": "chore: convert American spellings to British English",
+      "refs": "",
+      "position": {
+        "x": 720,
+        "y": 460,
+        "lane": 1,
+        "radius": 6,
+        "depth": 10,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "66ab799ae6cc5cea193229ab4ca90800771a16fd",
+      "short": "66ab799",
+      "parents": "70648d64a48fd589759b307b3056da3f2453f16c",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-09-28T03:19:13Z",
+      "timestamp": 1790565553,
+      "subject": "chore: update CHANGELOG for v0.1.1",
+      "refs": "tag: v0.1.1",
+      "position": {
+        "x": 600,
+        "y": 540,
+        "lane": 0,
+        "radius": 9,
+        "depth": 11,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": true
+      }
+    },
+    {
+      "sha": "70648d64a48fd589759b307b3056da3f2453f16c",
+      "short": "70648d6",
+      "parents": "076823adff3b593c15797f3dd2d72839b0366ad7",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T11:51:51Z",
+      "timestamp": 1790509911,
+      "subject": "fix(obs-safe-launch): release stale device holder in --no-loopback mode",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 580,
+        "lane": 0,
+        "radius": 6,
+        "depth": 12,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "076823adff3b593c15797f3dd2d72839b0366ad7",
+      "short": "076823a",
+      "parents": "26fbb3f9fd1e61459ea200c3e90a109f03674fca",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T11:47:17Z",
+      "timestamp": 1790509637,
+      "subject": "fix(hide_v4l2,obs-safe-launch): block physical device fallback in loopback mode",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 620,
+        "lane": 0,
+        "radius": 6,
+        "depth": 13,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "26fbb3f9fd1e61459ea200c3e90a109f03674fca",
+      "short": "26fbb3f",
+      "parents": "9fdfe673c753a34df52d5499760f3631d28973f6",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T11:37:00Z",
+      "timestamp": 1790509020,
+      "subject": "fix(feed,obs-safe-launch): revert queue to 8, remove broken timeout image, adjust audio delay",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 660,
+        "lane": 0,
+        "radius": 6,
+        "depth": 14,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "9fdfe673c753a34df52d5499760f3631d28973f6",
+      "short": "9fdfe67",
+      "parents": "b4d76f21ece6fcce9a983cb3903e351e80be49fa",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T11:28:43Z",
+      "timestamp": 1790508523,
+      "subject": "fix(feed,audio,loopback): reduce A/V offset, stop reset spam, hold frame on restart",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 700,
+        "lane": 0,
+        "radius": 6,
+        "depth": 15,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "b4d76f21ece6fcce9a983cb3903e351e80be49fa",
+      "short": "b4d76f2",
+      "parents": "97cce04c31b011638de6c5a195c97609fdfc30ff",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T11:15:37Z",
+      "timestamp": 1790507737,
+      "subject": "fix(feed,supervise_feed): discard corrupt MJPEG packets, restart inline on freeze",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 740,
+        "lane": 0,
+        "radius": 6,
+        "depth": 16,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "97cce04c31b011638de6c5a195c97609fdfc30ff",
+      "short": "97cce04",
+      "parents": "fa6f6209c3858252e496fb17f680957b23d53438",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T10:28:40Z",
+      "timestamp": 1790504920,
+      "subject": "fix(obs-safe-launch): replace D-state freeze check with write_bytes stall detection",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 780,
+        "lane": 0,
+        "radius": 6,
+        "depth": 17,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "fa6f6209c3858252e496fb17f680957b23d53438",
+      "short": "fa6f620",
+      "parents": "0d18a2cf658b59540c87f618467c99e90f9795c3",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T10:10:30Z",
+      "timestamp": 1790503830,
+      "subject": "fix(obs-safe-launch): audio setup for all feed paths, clean supervise_feed shutdown, freeze detection",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 820,
+        "lane": 0,
+        "radius": 6,
+        "depth": 18,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "0d18a2cf658b59540c87f618467c99e90f9795c3",
+      "short": "0d18a2c",
+      "parents": "3c04b596f3e52daa89eee72b6b9b4e334e6ff02c",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T09:47:21Z",
+      "timestamp": 1790502441,
+      "subject": "fix(obs-safe-launch): use module-virtual-source instead of null-sink monitor",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 860,
+        "lane": 0,
+        "radius": 6,
+        "depth": 19,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "3c04b596f3e52daa89eee72b6b9b4e334e6ff02c",
+      "short": "3c04b59",
+      "parents": "76f1629f0ce5dd16f923e0d08ff280cf79f81617",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T09:39:27Z",
+      "timestamp": 1790501967,
+      "subject": "fix(obs-safe-launch): unload virtual sink on exit, auto-configure OBS audio profile",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 900,
+        "lane": 0,
+        "radius": 6,
+        "depth": 20,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "76f1629f0ce5dd16f923e0d08ff280cf79f81617",
+      "short": "76f1629",
+      "parents": "7dd5db63fa1a6ebc6ac2e483d6591fb417e7b306",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T09:23:37Z",
+      "timestamp": 1790501017,
+      "subject": "fix(obs-safe-launch): suppress pactl module ID output; add 1s settle before OBS audio enumeration",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 940,
+        "lane": 0,
+        "radius": 6,
+        "depth": 21,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "7dd5db63fa1a6ebc6ac2e483d6591fb417e7b306",
+      "short": "7dd5db6",
+      "parents": "c078232dbf303ca57452bdd8982d53c3e0ef98d5",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T08:57:02Z",
+      "timestamp": 1790499422,
+      "subject": "fix(obs-safe-launch,Makefile): add pulseaudio-utils to deps; split audio routing condition with explicit warnings",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 980,
+        "lane": 0,
+        "radius": 6,
+        "depth": 22,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c078232dbf303ca57452bdd8982d53c3e0ef98d5",
+      "short": "c078232",
+      "parents": "dab70f86d46683f166551c3c32c25864a2f262c5",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T08:48:36Z",
+      "timestamp": 1790498916,
+      "subject": "fix(obs-safe-launch): add audio source diagnostic log; add 1s framerate settle",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1020,
+        "lane": 0,
+        "radius": 6,
+        "depth": 23,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "dab70f86d46683f166551c3c32c25864a2f262c5",
+      "short": "dab70f8",
+      "parents": "5dac2985428e41c04e707836360f7e7b5681fde4",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T08:42:00Z",
+      "timestamp": 1790498520,
+      "subject": "fix(install,obs-safe-launch): derive audio source from USB serial, no pactl needed",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1060,
+        "lane": 0,
+        "radius": 6,
+        "depth": 24,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "5dac2985428e41c04e707836360f7e7b5681fde4",
+      "short": "5dac298",
+      "parents": "28eb49348de7739b5e43d88891c74637eb03cb0e",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T08:30:38Z",
+      "timestamp": 1790497838,
+      "subject": "fix(install,obs-safe-launch): fix pactl failing under sudo by passing XDG_RUNTIME_DIR; add runtime audio detection fallback",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1100,
+        "lane": 0,
+        "radius": 6,
+        "depth": 25,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "28eb49348de7739b5e43d88891c74637eb03cb0e",
+      "short": "28eb493",
+      "parents": "5670b88dc025574c3bc0a69666554eb1fac0b243",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T08:20:34Z",
+      "timestamp": 1790497234,
+      "subject": "fix(obs-safe-launch): stop loopback service in --no-loopback mode, restore on exit",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1140,
+        "lane": 0,
+        "radius": 6,
+        "depth": 26,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "5670b88dc025574c3bc0a69666554eb1fac0b243",
+      "short": "5670b88",
+      "parents": "ec2e72a362a866e2461ed8386e86de724c0a69e3",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T08:20:01Z",
+      "timestamp": 1790497201,
+      "subject": "refactor(install,obs-safe-launch,Makefile): replace Python JSON scene patching with jq",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1180,
+        "lane": 0,
+        "radius": 6,
+        "depth": 27,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "ec2e72a362a866e2461ed8386e86de724c0a69e3",
+      "short": "ec2e72a",
+      "parents": "6ade59a62f3f4a74a24acb053d7295a545eee54d",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T08:14:31Z",
+      "timestamp": 1790496871,
+      "subject": "feat(obs-safe-launch,install): route capture card audio through FFmpeg for A/V sync",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1220,
+        "lane": 0,
+        "radius": 6,
+        "depth": 28,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "6ade59a62f3f4a74a24acb053d7295a545eee54d",
+      "short": "6ade59a",
+      "parents": "f3ac9c9c7e9cff2edf604a93689c8911b21f8a74",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T08:01:29Z",
+      "timestamp": 1790496089,
+      "subject": "fix(install): use exclusive_caps=0 for v4l2loopback service to prevent format-change EBUSY",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1260,
+        "lane": 0,
+        "radius": 6,
+        "depth": 29,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "f3ac9c9c7e9cff2edf604a93689c8911b21f8a74",
+      "short": "f3ac9c9",
+      "parents": "c3e537d57e9edfb9815cb477e50e595a4e7a0d4c",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T07:32:10Z",
+      "timestamp": 1790494330,
+      "subject": "revert(feed): remove explicit pix_fmt from MJPEG re-encode",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1300,
+        "lane": 0,
+        "radius": 6,
+        "depth": 30,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c3e537d57e9edfb9815cb477e50e595a4e7a0d4c",
+      "short": "c3e537d",
+      "parents": "89bf9416b66dac44679a7aaa7646873e3a366507",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T07:24:38Z",
+      "timestamp": 1790493878,
+      "subject": "fix(feed): set yuvj422p chroma on MJPEG re-encode to fix BGR3/emulated artefacts",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1340,
+        "lane": 0,
+        "radius": 6,
+        "depth": 31,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "89bf9416b66dac44679a7aaa7646873e3a366507",
+      "short": "89bf941",
+      "parents": "efad85b990d834b76b728e0bda999598c0c71232",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T07:12:07Z",
+      "timestamp": 1790493127,
+      "subject": "feat(feed): MJPG decode+re-encode for native MJPEG in loopback; fix loopback format wait poll",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1380,
+        "lane": 0,
+        "radius": 6,
+        "depth": 32,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "efad85b990d834b76b728e0bda999598c0c71232",
+      "short": "efad85b",
+      "parents": "e77bacb9f34f23671a7696e72820c2afb820283a",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-27T07:07:07Z",
+      "timestamp": 1790492827,
+      "subject": "fix(obs-safe-launch): re-patch scene device on every loopback launch, wait for loopback format",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1420,
+        "lane": 0,
+        "radius": 6,
+        "depth": 33,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "e77bacb9f34f23671a7696e72820c2afb820283a",
+      "short": "e77bacb",
+      "parents": "a8a52b5cfe060ace749db38ce433adca440171a9",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T14:41:50Z",
+      "timestamp": 1790433710,
+      "subject": "fix(feed): revert MJPG passthrough, restore NV12 decode pipeline with -r fps With MJPG passthrough, malformed compressed frames hit OBS's avcodec decoder directly. avcodec_send_packet returns a hard error; OBS's v4l2 source treats this as permanent and stops retrying, breaking the recovery cycle. With the NV12 decode pipeline, FFmpeg's internal MJPEG decoder absorbs the corrupted input using error concealment and still produces valid raw pixel output. OBS reading NV12 from the loopback has no decode step at all, so a hard codec failure is not possible - it just renders whatever pixels arrive and handles timeouts cleanly when the writer is absent.",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1460,
+        "lane": 0,
+        "radius": 6,
+        "depth": 34,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "a8a52b5cfe060ace749db38ce433adca440171a9",
+      "short": "a8a52b5",
+      "parents": "0e5d7dbb64355572703b7146654a508c90585fb0",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T14:04:05Z",
+      "timestamp": 1790431445,
+      "subject": "revert(obs-safe-launch): remove v4l2loopback-ctl set-fps calls",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1500,
+        "lane": 0,
+        "radius": 6,
+        "depth": 35,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "0e5d7dbb64355572703b7146654a508c90585fb0",
+      "short": "0e5d7db",
+      "parents": "85b9bde19cde206b6afade780379b107f226989b",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T14:00:17Z",
+      "timestamp": 1790431217,
+      "subject": "fix(obs-safe-launch,Makefile): lock loopback framerate via v4l2loopback-ctl to suppress 1000fps quirk",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1540,
+        "lane": 0,
+        "radius": 6,
+        "depth": 36,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "85b9bde19cde206b6afade780379b107f226989b",
+      "short": "85b9bde",
+      "parents": "e55a800d4f22e123ecd63effd7b75a1a3d0c4bc9",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T13:35:19Z",
+      "timestamp": 1790429719,
+      "subject": "fix(feed,install): declare loopback framerate for 60fps, fix scene patch under double-sudo",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1580,
+        "lane": 0,
+        "radius": 6,
+        "depth": 37,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "e55a800d4f22e123ecd63effd7b75a1a3d0c4bc9",
+      "short": "e55a800",
+      "parents": "77236dba31dd304884b0f745f0c5a4f8f2f94794",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T13:19:12Z",
+      "timestamp": 1790428752,
+      "subject": "fix(install): patch scene to loopback device, restart service after config change",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1620,
+        "lane": 0,
+        "radius": 6,
+        "depth": 38,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "77236dba31dd304884b0f745f0c5a4f8f2f94794",
+      "short": "77236db",
+      "parents": "c78c70d4152984e3d9e3c5c0413f8f8ee847227d",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T13:19:02Z",
+      "timestamp": 1790428742,
+      "subject": "feat(feed): MJPG native pass-through to loopback",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1660,
+        "lane": 0,
+        "radius": 6,
+        "depth": 39,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c78c70d4152984e3d9e3c5c0413f8f8ee847227d",
+      "short": "c78c70d",
+      "parents": "e4c58bed013c7f025eedec75a946ec61cb282503",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T13:04:37Z",
+      "timestamp": 1790427877,
+      "subject": "fix(obs-safe-launch): stop spurious supervisor restarts after shutdown",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1700,
+        "lane": 0,
+        "radius": 6,
+        "depth": 40,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "e4c58bed013c7f025eedec75a946ec61cb282503",
+      "short": "e4c58be",
+      "parents": "9661c151b746f6cee06dbf7b1ac00a60d020e429",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T13:04:30Z",
+      "timestamp": 1790427870,
+      "subject": "feat(parse_formats): include MJPG so 4K@60fps is selected over NV12@30fps",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1740,
+        "lane": 0,
+        "radius": 6,
+        "depth": 41,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "9661c151b746f6cee06dbf7b1ac00a60d020e429",
+      "short": "9661c15",
+      "parents": "e1e8427037117d5de9f003c9676f4e8625405285",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T12:52:18Z",
+      "timestamp": 1790427138,
+      "subject": "fix(install,generate_obs_aliases,optimise_drivers): exclude loopback from device picker, remove stale modprobe check, fix unbound var",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1780,
+        "lane": 0,
+        "radius": 6,
+        "depth": 42,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "e1e8427037117d5de9f003c9676f4e8625405285",
+      "short": "e1e8427",
+      "parents": "a39c5524c5e645c3fa903f9ce114f659b83fe948",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T12:52:09Z",
+      "timestamp": 1790427129,
+      "subject": "refactor(obs-safe-launch): embed safe flags in run_obs, fix feed device-busy, clean up log messages",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1820,
+        "lane": 0,
+        "radius": 6,
+        "depth": 43,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "a39c5524c5e645c3fa903f9ce114f659b83fe948",
+      "short": "a39c552",
+      "parents": "84551c29ba0d73a5fffa7bf6482a3339cd224539",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T12:42:16Z",
+      "timestamp": 1790426536,
+      "subject": "feat(Makefile,install): integrate deps and driver optimisation into make install; fix DKMS visibility; fix scene device path",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1860,
+        "lane": 0,
+        "radius": 6,
+        "depth": 44,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "84551c29ba0d73a5fffa7bf6482a3339cd224539",
+      "short": "84551c2",
+      "parents": "c82512d2dfc0c50a33ee2cae0106cdae56eefa02",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-26T12:42:05Z",
+      "timestamp": 1790426525,
+      "subject": "feat(obs-safe-launch): apply --safe-mode and --disable-missing-files-check on every launch",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1900,
+        "lane": 0,
+        "radius": 6,
+        "depth": 45,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c82512d2dfc0c50a33ee2cae0106cdae56eefa02",
+      "short": "c82512d",
+      "parents": "e5b8280499290427a9509a3e39deb7e5283e0d12",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-25T23:17:12Z",
+      "timestamp": 1790378232,
+      "subject": "fix(install,generate_obs_aliases): use --list-formats filter and patch OBS scene on install",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1940,
+        "lane": 0,
+        "radius": 6,
+        "depth": 46,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "e5b8280499290427a9509a3e39deb7e5283e0d12",
+      "short": "e5b8280",
+      "parents": "72532c5aff391340f0ace69f2493e69023e3373b",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-25T23:17:03Z",
+      "timestamp": 1790378223,
+      "subject": "feat(Makefile): auto-run make deps when v4l2loopback module is missing on install",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1980,
+        "lane": 0,
+        "radius": 6,
+        "depth": 47,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "72532c5aff391340f0ace69f2493e69023e3373b",
+      "short": "72532c5",
+      "parents": "37fe654d13d034b56548a9778d979eeace3f37c8",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-25T23:01:28Z",
+      "timestamp": 1790377288,
+      "subject": "fix(install): point to make deps when v4l2loopback is missing",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 2020,
+        "lane": 0,
+        "radius": 6,
+        "depth": 48,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "37fe654d13d034b56548a9778d979eeace3f37c8",
+      "short": "37fe654",
+      "parents": "62744db5bb3ccb989ac1930c4bc2466ffdbd4b22",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-25T23:01:23Z",
+      "timestamp": 1790377283,
+      "subject": "fix(obs-safe-launch): fall back to direct device mode when v4l2loopback unavailable",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 2060,
+        "lane": 0,
+        "radius": 6,
+        "depth": 49,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "62744db5bb3ccb989ac1930c4bc2466ffdbd4b22",
+      "short": "62744db",
+      "parents": "d65b0a2bd8627e927b23444bf94916d7c50f1411",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-25T22:17:23Z",
+      "timestamp": 1790374643,
+      "subject": "fix(obs-safe-launch): detect snap-confined OBS and warn shim is ineffective",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 2100,
+        "lane": 0,
+        "radius": 6,
+        "depth": 50,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "d65b0a2bd8627e927b23444bf94916d7c50f1411",
+      "short": "d65b0a2",
+      "parents": "7943bc9c622da6abf9dee27b13236173f4c8ac52",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-25T22:17:18Z",
+      "timestamp": 1790374638,
+      "subject": "fix(install): filter device picker to capture-only nodes",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 2140,
+        "lane": 0,
+        "radius": 6,
+        "depth": 51,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "7943bc9c622da6abf9dee27b13236173f4c8ac52",
+      "short": "7943bc9",
+      "parents": "4b19df3d9ffae5ee4017b07b1baa75458d05ab67",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-25T22:01:53Z",
+      "timestamp": 1790373713,
+      "subject": "build(scripts): update usbreset binary from local make build",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 2180,
+        "lane": 0,
+        "radius": 6,
+        "depth": 52,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "4b19df3d9ffae5ee4017b07b1baa75458d05ab67",
+      "short": "4b19df3",
+      "parents": "6c7af66383f1dd688c1f68449fb801039e2b22c7",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-25T22:01:50Z",
+      "timestamp": 1790373710,
+      "subject": "fix(generate_obs_aliases): mark script executable",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 2220,
+        "lane": 0,
+        "radius": 6,
+        "depth": 53,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "6c7af66383f1dd688c1f68449fb801039e2b22c7",
+      "short": "6c7af66",
+      "parents": "8afdd5530f3fce6e7e9d7f675b2b576c2b2c2573",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-25T21:59:30Z",
+      "timestamp": 1790373570,
+      "subject": "fix(install,generate_obs_aliases): remove uvcdynctrl, filter cobs to capture-only nodes",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 2260,
+        "lane": 0,
+        "radius": 6,
+        "depth": 54,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "8afdd5530f3fce6e7e9d7f675b2b576c2b2c2573",
+      "short": "8afdd55",
+      "parents": "5f5c292e6315cddc0f1dbf25c3c632195fc47cb2",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-25T21:59:23Z",
+      "timestamp": 1790373563,
+      "subject": "fix(obs-safe-launch): remove config isolation, use pre-built shim, add --disable-missing-files-check",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 2300,
+        "lane": 0,
+        "radius": 6,
+        "depth": 55,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "5f5c292e6315cddc0f1dbf25c3c632195fc47cb2",
+      "short": "5f5c292",
+      "parents": "b9894c7ac6045de0dfa7b97d4f4595cc098809f9",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-25T21:59:14Z",
+      "timestamp": 1790373554,
+      "subject": "feat(Makefile,src): pre-build hide_v4l2.so and improve build verbosity",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 2340,
+        "lane": 0,
+        "radius": 6,
+        "depth": 56,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "b9894c7ac6045de0dfa7b97d4f4595cc098809f9",
+      "short": "b9894c7",
+      "parents": "7c9fd45e6c8fb76cb084fae39fddbca59c7db853",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-24T22:08:55Z",
+      "timestamp": 1790287735,
+      "subject": "fix(obs-safe-launch): v4l2loopback DKMS rebuild, restart after stuck OBS, safe-mode on recovery",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 2380,
+        "lane": 0,
+        "radius": 6,
+        "depth": 57,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "7c9fd45e6c8fb76cb084fae39fddbca59c7db853",
+      "short": "7c9fd45",
+      "parents": "2eb8025477c4e0ca581d8286ebaa875d7b760663",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-09-24T22:08:35Z",
+      "timestamp": 1790287715,
+      "subject": "fix(check_deps,Makefile): correct package names and add deps install target",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 2420,
+        "lane": 0,
+        "radius": 6,
+        "depth": 58,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "d9e24fc54832052a1fbad124bd857483cd9e94c1",
+      "short": "d9e24fc",
+      "parents": "159f53f687e6f042f96bda39846a4040c6a63cec",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-09-14T03:05:33Z",
+      "timestamp": 1789355133,
+      "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
+      "refs": "tag: v0.1.0",
+      "position": {
+        "x": 480,
+        "y": 2460,
+        "lane": -1,
+        "radius": 6,
+        "depth": 59,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "159f53f687e6f042f96bda39846a4040c6a63cec",
+      "short": "159f53f",
+      "parents": "dc6acd3181647438538fa14456564b23c0b8adc6",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-09-07T02:35:58Z",
+      "timestamp": 1788748558,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 840,
+        "y": 2540,
+        "lane": 2,
+        "radius": 6,
+        "depth": 60,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "dc6acd3181647438538fa14456564b23c0b8adc6",
+      "short": "dc6acd3",
+      "parents": "89481cf2ab352c4f5ddcffbc18fdf5ed484e4c1b",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-08-17T00:59:27Z",
+      "timestamp": 1786928367,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 360,
+        "y": 2620,
+        "lane": -2,
+        "radius": 6,
+        "depth": 61,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "89481cf2ab352c4f5ddcffbc18fdf5ed484e4c1b",
+      "short": "89481cf",
+      "parents": "e2c01223c21ba4103fb5a8d6c1fe13845a22ccce",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-08-10T01:21:28Z",
+      "timestamp": 1786324888,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 960,
+        "y": 2700,
+        "lane": 3,
+        "radius": 6,
+        "depth": 62,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "e2c01223c21ba4103fb5a8d6c1fe13845a22ccce",
+      "short": "e2c0122",
+      "parents": "0ec1d7fa33329bd95e9e8d1d006d8f83e48f5f9b",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-08-03T02:25:21Z",
+      "timestamp": 1785723921,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 240,
+        "y": 2780,
+        "lane": -3,
+        "radius": 6,
+        "depth": 63,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "0ec1d7fa33329bd95e9e8d1d006d8f83e48f5f9b",
+      "short": "0ec1d7f",
+      "parents": "b7095ee531029b905fa29ef90618329897730dc3",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-07-27T02:31:50Z",
+      "timestamp": 1785119510,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 1080,
+        "y": 2860,
+        "lane": 4,
+        "radius": 6,
+        "depth": 64,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "b7095ee531029b905fa29ef90618329897730dc3",
+      "short": "b7095ee",
+      "parents": "c9d0a1b37c74693dee1f2d8359519ac511e0c1ff",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-07-20T02:35:04Z",
+      "timestamp": 1784514904,
+      "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
+      "refs": "",
+      "position": {
+        "x": 120,
+        "y": 2940,
+        "lane": -4,
+        "radius": 6,
+        "depth": 65,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c9d0a1b37c74693dee1f2d8359519ac511e0c1ff",
+      "short": "c9d0a1b",
+      "parents": "7da728a3832cae275ce00cb3cf3aa25fdbdf03cb",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-07-13T02:23:56Z",
+      "timestamp": 1783909436,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 1200,
+        "y": 3020,
+        "lane": 5,
+        "radius": 6,
+        "depth": 66,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "7da728a3832cae275ce00cb3cf3aa25fdbdf03cb",
+      "short": "7da728a",
+      "parents": "46401583731db7099b68ad94e914eaf183caae8f",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-07-06T02:46:38Z",
+      "timestamp": 1783305998,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 0,
+        "y": 3100,
+        "lane": -5,
+        "radius": 6,
+        "depth": 67,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "46401583731db7099b68ad94e914eaf183caae8f",
+      "short": "4640158",
+      "parents": "2b02a3cc5337517b34f634cd62b6ef49a5f37dfc",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-06-29T03:29:27Z",
+      "timestamp": 1782703767,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 1320,
+        "y": 3180,
+        "lane": 6,
+        "radius": 6,
+        "depth": 68,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "2b02a3cc5337517b34f634cd62b6ef49a5f37dfc",
+      "short": "2b02a3c",
+      "parents": "fc5cfd683b3faab05f42d141e67e659bd8a27910",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-06-22T03:46:12Z",
+      "timestamp": 1782099972,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": -120,
+        "y": 3260,
+        "lane": -6,
+        "radius": 6,
+        "depth": 69,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "fc5cfd683b3faab05f42d141e67e659bd8a27910",
+      "short": "fc5cfd6",
+      "parents": "68c3df512dab15d74c0fde689cebc8065ce2c035",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-06-15T03:46:28Z",
+      "timestamp": 1781495188,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 1440,
+        "y": 3340,
+        "lane": 7,
+        "radius": 6,
+        "depth": 70,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "68c3df512dab15d74c0fde689cebc8065ce2c035",
+      "short": "68c3df5",
+      "parents": "dd727f0e76a30fea8f493a8d5e9a91010e9b0254",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-06-08T03:34:44Z",
+      "timestamp": 1780889684,
+      "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
+      "refs": "",
+      "position": {
+        "x": -240,
+        "y": 3420,
+        "lane": -7,
+        "radius": 6,
+        "depth": 71,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "dd727f0e76a30fea8f493a8d5e9a91010e9b0254",
+      "short": "dd727f0",
+      "parents": "c8b70f7957d91e4e7a7c5efcd3f71e4bbfa5780c",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-06-01T03:37:37Z",
+      "timestamp": 1780285057,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 1560,
+        "y": 3500,
+        "lane": 8,
+        "radius": 6,
+        "depth": 72,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c8b70f7957d91e4e7a7c5efcd3f71e4bbfa5780c",
+      "short": "c8b70f7",
+      "parents": "080b55c6b4c7e2c1b7a7c94a290aa10ceaedef83",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-05-25T03:26:16Z",
+      "timestamp": 1779679576,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": -360,
+        "y": 3580,
+        "lane": -8,
+        "radius": 6,
+        "depth": 73,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "080b55c6b4c7e2c1b7a7c94a290aa10ceaedef83",
+      "short": "080b55c",
+      "parents": "b80d76cf2a4de558827fe3fe0cd9d49864c9e94e",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-05-18T02:53:59Z",
+      "timestamp": 1779072839,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 1680,
+        "y": 3660,
+        "lane": 9,
+        "radius": 6,
+        "depth": 74,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "b80d76cf2a4de558827fe3fe0cd9d49864c9e94e",
+      "short": "b80d76c",
+      "parents": "2da85ba3adb83cfebfdd6c24de50c41be7edb2be",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-05-11T02:46:04Z",
+      "timestamp": 1778467564,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": -480,
+        "y": 3740,
+        "lane": -9,
+        "radius": 6,
+        "depth": 75,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "2da85ba3adb83cfebfdd6c24de50c41be7edb2be",
+      "short": "2da85ba",
+      "parents": "6dae7c4d35065b85220acb7d085ae7b56e0fef8b",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-05-04T02:32:18Z",
+      "timestamp": 1777861938,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 1800,
+        "y": 3820,
+        "lane": 10,
+        "radius": 6,
+        "depth": 76,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "6dae7c4d35065b85220acb7d085ae7b56e0fef8b",
+      "short": "6dae7c4",
+      "parents": "cf7592c9a84d69b9fc9620d0d635cb690060b3cc",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-04-27T02:27:44Z",
+      "timestamp": 1777256864,
+      "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
+      "refs": "",
+      "position": {
+        "x": -600,
+        "y": 3900,
+        "lane": -10,
+        "radius": 6,
+        "depth": 77,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "cf7592c9a84d69b9fc9620d0d635cb690060b3cc",
+      "short": "cf7592c",
+      "parents": "ff9aa0b9af4f1ade41c4236559a3d041a881a102",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-04-20T02:14:35Z",
+      "timestamp": 1776651275,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 1920,
+        "y": 3980,
+        "lane": 11,
+        "radius": 6,
+        "depth": 78,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "ff9aa0b9af4f1ade41c4236559a3d041a881a102",
+      "short": "ff9aa0b",
+      "parents": "5c31064d41453bdef87356c7b7e622a173093efd",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-04-13T02:14:21Z",
+      "timestamp": 1776046461,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": -720,
+        "y": 4060,
+        "lane": -11,
+        "radius": 6,
+        "depth": 79,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "5c31064d41453bdef87356c7b7e622a173093efd",
+      "short": "5c31064",
+      "parents": "85cc669f1a6de5879ac15a25497d3375683a2828",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-04-06T02:06:45Z",
+      "timestamp": 1775441205,
+      "subject": "chore: update git tree visualisation",
+      "refs": "",
+      "position": {
+        "x": 2040,
+        "y": 4140,
+        "lane": 12,
+        "radius": 6,
+        "depth": 80,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "85cc669f1a6de5879ac15a25497d3375683a2828",
+      "short": "85cc669",
+      "parents": "1ece3e53e26fa6a70712ae382f8166ae3d7d404f a825a385b61a6fefd6fd7da27ae9b21426b51d04",
+      "author": "xaostech[bot]",
+      "email": "260314499+xaostech[bot]@users.noreply.github.com",
+      "date": "2026-04-01T02:08:58Z",
+      "timestamp": 1775009338,
+      "subject": "Merge pull request #1 from XAOSTECH:anglicise/20260401-020828",
+      "refs": "",
+      "position": {
+        "x": -840,
+        "y": 4220,
+        "lane": -12,
+        "radius": 10,
+        "depth": 81,
+        "is_trunk": false,
+        "is_merge": true,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "a825a385b61a6fefd6fd7da27ae9b21426b51d04",
+      "short": "a825a38",
+      "parents": "1ece3e53e26fa6a70712ae382f8166ae3d7d404f",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-04-01T02:08:28Z",
+      "timestamp": 1775009308,
+      "subject": "chore: convert American spellings to British English",
+      "refs": "",
+      "position": {
+        "x": 2160,
+        "y": 4300,
+        "lane": 13,
+        "radius": 6,
+        "depth": 82,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "1ece3e53e26fa6a70712ae382f8166ae3d7d404f",
+      "short": "1ece3e5",
+      "parents": "2eb8025477c4e0ca581d8286ebaa875d7b760663",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-03-30T02:05:52Z",
+      "timestamp": 1774836352,
+      "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
+      "refs": "",
+      "position": {
+        "x": -960,
+        "y": 4380,
+        "lane": -13,
+        "radius": 9,
+        "depth": 83,
+        "is_trunk": false,
+        "is_merge": false,
+        "is_fork": true
+      }
+    },
+    {
+      "sha": "2eb8025477c4e0ca581d8286ebaa875d7b760663",
+      "short": "2eb8025",
+      "parents": "41d04d457a879d62ba04b5ef9d1632911997ba22",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-23T17:55:09+01:00",
+      "timestamp": 1774284909,
+      "subject": "chore(dc-init): load workflows,actions",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4460,
+        "lane": 0,
+        "radius": 9,
+        "depth": 84,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": true
+      }
+    },
+    {
+      "sha": "41d04d457a879d62ba04b5ef9d1632911997ba22",
+      "short": "41d04d4",
+      "parents": "d54c781ebdba50361ea552378f27fbef712aa33a",
+      "author": "XAOSTECH",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-15T07:51:54+01:00",
+      "timestamp": 1773557514,
+      "subject": "Improve --no-device isolation and preserve OBS settings",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4500,
+        "lane": 0,
+        "radius": 6,
+        "depth": 85,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "d54c781ebdba50361ea552378f27fbef712aa33a",
+      "short": "d54c781",
+      "parents": "53e140c15d555a2a3b6a2a62d1785d922dcfeac8",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-15T06:29:18+01:00",
+      "timestamp": 1773552558,
+      "subject": "chore(dc-init): update workflows,actions",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4540,
+        "lane": 0,
+        "radius": 6,
+        "depth": 86,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "53e140c15d555a2a3b6a2a62d1785d922dcfeac8",
+      "short": "53e140c",
+      "parents": "b42b109d088d94ea7838e8519b663dca78c491c0",
+      "author": "XAOSTECH",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-15T03:50:17+01:00",
+      "timestamp": 1773543017,
+      "subject": "Harden --no-device mode with process-level isolation",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4580,
+        "lane": 0,
+        "radius": 6,
+        "depth": 87,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "b42b109d088d94ea7838e8519b663dca78c491c0",
+      "short": "b42b109",
+      "parents": "b941e013061089f817393651095b8611b9ad2c8a",
+      "author": "XAOSTECH",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-14T20:36:34+01:00",
+      "timestamp": 1773516994,
+      "subject": "feat: add sobs/cobs host aliases and Makefile targets",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4620,
+        "lane": 0,
+        "radius": 6,
+        "depth": 88,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "b941e013061089f817393651095b8611b9ad2c8a",
+      "short": "b941e01",
+      "parents": "3475fa6e848f2c2e71694386ea40a5db241eac2f",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-03-06T04:43:25Z",
+      "timestamp": 1772772205,
+      "subject": "chore: update CHANGELOG for v0.1.0",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4660,
+        "lane": 0,
+        "radius": 6,
+        "depth": 89,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "3475fa6e848f2c2e71694386ea40a5db241eac2f",
+      "short": "3475fa6",
+      "parents": "8a1e113193cd94a0d106c23daf01365f48a27bd1",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-06T05:32:42+01:00",
+      "timestamp": 1772771562,
+      "subject": "chore(dc-init): update workflows and actions",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4700,
+        "lane": 0,
+        "radius": 6,
+        "depth": 90,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "8a1e113193cd94a0d106c23daf01365f48a27bd1",
+      "short": "8a1e113",
+      "parents": "0678f7ca888f144c92782736d8cf6c6c7c8c9625",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-06T02:55:41+01:00",
+      "timestamp": 1772762141,
+      "subject": "Fix crash recovery limit logic: default unlimited, non-cumulative",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4740,
+        "lane": 0,
+        "radius": 6,
+        "depth": 91,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "0678f7ca888f144c92782736d8cf6c6c7c8c9625",
+      "short": "0678f7c",
+      "parents": "42f908b28f12f2429083e46d8462f5ad78c07590",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-02T01:20:38+01:00",
+      "timestamp": 1772410838,
+      "subject": "fix(readme)",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4780,
+        "lane": 0,
+        "radius": 6,
+        "depth": 92,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "42f908b28f12f2429083e46d8462f5ad78c07590",
+      "short": "42f908b",
+      "parents": "e54b95924c2631589724c3d3f70a31e95069eea7",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-01T06:46:44+01:00",
+      "timestamp": 1772344004,
+      "subject": "Remove unnecessary sudo from kill in cleanup",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4820,
+        "lane": 0,
+        "radius": 6,
+        "depth": 93,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "e54b95924c2631589724c3d3f70a31e95069eea7",
+      "short": "e54b959",
+      "parents": "5d18e93ae1b76c39ab7b5943be1ca171830c06a2",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-01T05:50:43+01:00",
+      "timestamp": 1772340643,
+      "subject": "Add sudoers rule for passwordless crash recovery",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4860,
+        "lane": 0,
+        "radius": 6,
+        "depth": 94,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "5d18e93ae1b76c39ab7b5943be1ca171830c06a2",
+      "short": "5d18e93",
+      "parents": "ae536f7cd58ee858b9a013f210cf1fc96be4fc7e",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-01T01:58:27+01:00",
+      "timestamp": 1772326707,
+      "subject": "Fix: handle crash recovery with proper error handling",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4900,
+        "lane": 0,
+        "radius": 6,
+        "depth": 95,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "ae536f7cd58ee858b9a013f210cf1fc96be4fc7e",
+      "short": "ae536f7",
+      "parents": "c3898baf60eaaf3aa766a519790a32c161b2b715",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-28T17:43:15+01:00",
+      "timestamp": 1772296995,
+      "subject": "Update: document safety launcher with latest crash recovery features",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4940,
+        "lane": 0,
+        "radius": 6,
+        "depth": 96,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c3898baf60eaaf3aa766a519790a32c161b2b715",
+      "short": "c3898ba",
+      "parents": "549946244a6e3b19d79d496e0cea0ee728c5bf9c",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-28T05:36:26+01:00",
+      "timestamp": 1772253386,
+      "subject": "Fix: disable set -e for OBS execution to allow crash recovery",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 4980,
+        "lane": 0,
+        "radius": 6,
+        "depth": 97,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "549946244a6e3b19d79d496e0cea0ee728c5bf9c",
+      "short": "5499462",
+      "parents": "c10ea31dee72030c16bbf2cf2f712051e6ebb8d0",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-28T04:41:13+01:00",
+      "timestamp": 1772250073,
+      "subject": "Add explicit debug logging for crash recovery troubleshooting",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5020,
+        "lane": 0,
+        "radius": 6,
+        "depth": 98,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c10ea31dee72030c16bbf2cf2f712051e6ebb8d0",
+      "short": "c10ea31",
+      "parents": "b2652d17671072090c1184534f8df5ed39a070c7",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-28T04:05:01+01:00",
+      "timestamp": 1772247901,
+      "subject": "Fix recovery timeout and stream state detection",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5060,
+        "lane": 0,
+        "radius": 6,
+        "depth": 99,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "b2652d17671072090c1184534f8df5ed39a070c7",
+      "short": "b2652d1",
+      "parents": "fc3b747325cc2da98d8a70bd7d59814347fde1eb",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-28T04:00:31+01:00",
+      "timestamp": 1772247631,
+      "subject": "Fix auto-resume to only restart stream after crash, not on first launch",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5100,
+        "lane": 0,
+        "radius": 6,
+        "depth": 100,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "fc3b747325cc2da98d8a70bd7d59814347fde1eb",
+      "short": "fc3b747",
+      "parents": "2b5d980f59fb98caf26368784d99ab4f3557c641",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-28T03:56:27+01:00",
+      "timestamp": 1772247387,
+      "subject": "Add automatic stream resumption after crash recovery > > - Add --auto-stream flag to manually enable streaming on launch > - Detect streaming state before crash by monitoring OBS logs > - Auto-inject --startstreaming flag when restarting after crash > - Preserve STREAM_STATE_FILE across crash recovery cycles > - Resume streaming automatically if OBS was streaming before crash",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5140,
+        "lane": 0,
+        "radius": 6,
+        "depth": 101,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "2b5d980f59fb98caf26368784d99ab4f3557c641",
+      "short": "2b5d980",
+      "parents": "e70830c3284539006f28a7bbac5c50836318466e",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-28T02:18:27+01:00",
+      "timestamp": 1772241507,
+      "subject": "obs-safe-launch: add --no-device for manual OBS config without device requirement",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5180,
+        "lane": 0,
+        "radius": 6,
+        "depth": 102,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "e70830c3284539006f28a7bbac5c50836318466e",
+      "short": "e70830c",
+      "parents": "6669a0223ee2ad4b1e402b9fcd9e06e7ee16a067",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-28T01:50:47+01:00",
+      "timestamp": 1772239847,
+      "subject": "obs-safe-launch: add direct-device mode without loopback",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5220,
+        "lane": 0,
+        "radius": 6,
+        "depth": 103,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "6669a0223ee2ad4b1e402b9fcd9e06e7ee16a067",
+      "short": "6669a02",
+      "parents": "c2df90609590e341fbf090ef882ebed9db2372ac",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-27T19:35:30+01:00",
+      "timestamp": 1772217330,
+      "subject": "feat(src): LD_PRELOAD shim to fix V4L2 loopback HDR colorspace",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5260,
+        "lane": 0,
+        "radius": 6,
+        "depth": 104,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c2df90609590e341fbf090ef882ebed9db2372ac",
+      "short": "c2df906",
+      "parents": "67b96ca3cd29831d63cb7a3546bfae51125d8148",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-27T18:25:10+01:00",
+      "timestamp": 1772213110,
+      "subject": "fix(obs-safe-launch): scan for loopback device instead of assuming video_nr",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5300,
+        "lane": 0,
+        "radius": 6,
+        "depth": 105,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "67b96ca3cd29831d63cb7a3546bfae51125d8148",
+      "short": "67b96ca",
+      "parents": "1ddb2afa1e427bcd8604e5a66471568825fd7866",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-27T18:01:08+01:00",
+      "timestamp": 1772211668,
+      "subject": "fix(feed.sh): preserve NV12 and propagate HDR metadata through loopback",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5340,
+        "lane": 0,
+        "radius": 6,
+        "depth": 106,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "1ddb2afa1e427bcd8604e5a66471568825fd7866",
+      "short": "1ddb2af",
+      "parents": "e1a56013979cfc8ed1ee116dbd4ec06c15d43310",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-23T23:52:43+01:00",
+      "timestamp": 1771887163,
+      "subject": "docs: add P010 HDR format support details and accuracy data",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5380,
+        "lane": 0,
+        "radius": 6,
+        "depth": 107,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "e1a56013979cfc8ed1ee116dbd4ec06c15d43310",
+      "short": "e1a5601",
+      "parents": "c3813fc5fe25adb3430cb279c4d7c411fe96fe69",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-23T01:11:39+01:00",
+      "timestamp": 1771805499,
+      "subject": "dc-init",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5420,
+        "lane": 0,
+        "radius": 6,
+        "depth": 108,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c3813fc5fe25adb3430cb279c4d7c411fe96fe69",
+      "short": "c3813fc",
+      "parents": "3467107c80c904d86d206e3e69b78e66a5c7bc53",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-19T00:33:59+01:00",
+      "timestamp": 1771457639,
+      "subject": "refactor: Simplify obs-safe wrapper and add USB stability guide",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5460,
+        "lane": 0,
+        "radius": 6,
+        "depth": 109,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "3467107c80c904d86d206e3e69b78e66a5c7bc53",
+      "short": "3467107",
+      "parents": "bddba2fa6dacd2b48103ff39e28a057d142ce701",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-19T00:19:30+01:00",
+      "timestamp": 1771456770,
+      "subject": "feat: Add official UGREEN driver documentation and fix obs-safe launcher paths",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5500,
+        "lane": 0,
+        "radius": 6,
+        "depth": 110,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "bddba2fa6dacd2b48103ff39e28a057d142ce701",
+      "short": "bddba2f",
+      "parents": "1da6177c23e18c2f38419a276777df7af52b5007",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-19T00:11:09+01:00",
+      "timestamp": 1771456269,
+      "subject": "feat: Add OBS safe launcher with USB device crash recovery",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5540,
+        "lane": 0,
+        "radius": 6,
+        "depth": 111,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "1da6177c23e18c2f38419a276777df7af52b5007",
+      "short": "1da6177",
+      "parents": "68e2512d71e34210b97e699cc73e2b2c9dd908dc",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-02-18T23:59:05+01:00",
+      "timestamp": 1771455545,
+      "subject": "dc-contain",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5580,
+        "lane": 0,
+        "radius": 6,
+        "depth": 112,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "68e2512d71e34210b97e699cc73e2b2c9dd908dc",
+      "short": "68e2512",
+      "parents": "ff9c653882741f4ed224c6ffe163116df5de8647",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2025-12-13T15:07:31+01:00",
+      "timestamp": 1765634851,
+      "subject": "feat: refactor maintenance system with centralised dispatcher and recovery tools",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5620,
+        "lane": 0,
+        "radius": 6,
+        "depth": 113,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "ff9c653882741f4ed224c6ffe163116df5de8647",
+      "short": "ff9c653",
+      "parents": "49587641871678e2b481deecc9b4473143cc4f96",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2025-12-13T12:32:03+01:00",
+      "timestamp": 1765625523,
+      "subject": "feat: add OBS Wayland GPU driver optimisation script",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5660,
+        "lane": 0,
+        "radius": 6,
+        "depth": 114,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "49587641871678e2b481deecc9b4473143cc4f96",
+      "short": "4958764",
+      "parents": "",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2025-12-10T13:08:04+01:00",
+      "timestamp": 1765368484,
+      "subject": "Init",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 5700,
+        "lane": 0,
+        "radius": 6,
+        "depth": 115,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    }
+  ],
+  "branches": [
+    {
+      "name": "ac254e5cfdf62f4a0421d0a491992b924f584948 fix(obs-safe-launch): remove SIGKILL fallback that was killing restarted OBS",
+      "sha": "*",
+      "current": false,
+      "merged": false
+    }
+  ],
+  "tags": [
+    {
+      "name": "latest",
+      "sha": "1ed8ce23670706aa884cb2c90ecca9c5f5f2fd09"
+    },
+    {
+      "name": "v0.1.0",
+      "sha": "6858480c71b44872a657d4789a26a1c393469d84"
+    },
+    {
+      "name": "v0.1.1",
+      "sha": "287785ef754ca34f752afbb7977e28cd5995baa1"
+    },
+    {
+      "name": "v0.1.2",
+      "sha": "3a88f9129d5750c37403b79ddc36648c125d6181"
+    }
+  ]
+}
+;
+
+        const canvas = document.getElementById('treeCanvas');
+        const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('tooltip');
+        const viewport = document.getElementById('viewport');
+        const statsEl = document.getElementById('stats');
+
+        let animationEnabled = true;
+        let windEnabled = true;
+        let frame = 0;
+        let hoveredCommit = null;
+        let selectedCommit = null;
+
+        // Build lookup maps
+        const commitBySha = {};
+        gitData.commits.forEach(c => { commitBySha[c.sha] = c; });
+
+        // Build tag lookup
+        const tagsBySha = {};
+        (gitData.tags || []).forEach(t => {
+            if (!tagsBySha[t.sha]) tagsBySha[t.sha] = [];
+            tagsBySha[t.sha].push(t.name);
+        });
+
+        // Build branch lookup
+        const branchBySha = {};
+        (gitData.branches || []).forEach(b => {
+            if (!branchBySha[b.sha]) branchBySha[b.sha] = [];
+            branchBySha[b.sha].push(b.name);
+        });
+
+        // Stats
+        const mergeCount = gitData.commits.filter(c => c.position && c.position.is_merge).length;
+        const forkCount = gitData.commits.filter(c => c.position && c.position.is_fork).length;
+        statsEl.textContent = `${gitData.commits.length} commits · ${mergeCount} merges · ${forkCount} forks · ${(gitData.tags || []).length} tags`;
+
+        // Branch colours (consistent per lane)
+        const LANE_COLOURS = [
+            '#4ade80', '#60a5fa', '#f472b6', '#fb923c', '#a78bfa',
+            '#34d399', '#fbbf24', '#f87171', '#38bdf8', '#c084fc',
+            '#2dd4bf', '#e879f9', '#facc15', '#818cf8', '#fb7185'
+        ];
+        function laneColour(lane) {
+            if (lane === 0) return '#4ade80'; // trunk green
+            const idx = ((Math.abs(lane) - 1) % (LANE_COLOURS.length - 1)) + 1;
+            return LANE_COLOURS[idx];
+        }
+
+        // Get ancestry chain for highlighting
+        function getAncestry(commit) {
+            const shas = new Set();
+            const queue = [commit.sha];
+            let limit = 500;
+            while (queue.length > 0 && limit-- > 0) {
+                const sha = queue.shift();
+                if (shas.has(sha)) continue;
+                shas.add(sha);
+                const c = commitBySha[sha];
+                if (c && c.parents) {
+                    c.parents.split(' ').filter(Boolean).forEach(p => queue.push(p));
+                }
+            }
+            return shas;
+        }
+
+        let ancestryHighlight = null;
+
+        // Wind intensity multiplier (0-5, default 1.0)
+        let windIntensity = 1.0;
+
+        function updateWindIntensity(val) {
+            windIntensity = val / 100;
+            document.getElementById('windVal').textContent = val + '%';
+            if (!animationEnabled) drawTree();
+        }
+
+        // Wind simulation — intensified base amplitudes
+        function windOffset(x, y, t) {
+            if (!windEnabled) return 0;
+            const s = windIntensity;
+            const w1 = Math.sin(t * 0.02 + x * 0.008 + y * 0.003) * 6 * s;
+            const w2 = Math.sin(t * 0.035 + x * 0.012 - y * 0.005) * 3 * s;
+            const w3 = Math.cos(t * 0.015 + y * 0.007) * 4 * s;
+            return w1 + w2 + w3;
+        }
+
+        function drawTree() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Dark background with subtle gradient
+            const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            bg.addColorStop(0, '#0a0a1a');
+            bg.addColorStop(0.5, '#0d0d20');
+            bg.addColorStop(1, '#080818');
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Subtle grid
+            ctx.strokeStyle = 'rgba(60, 60, 100, 0.08)';
+            ctx.lineWidth = 0.5;
+            for (let y = 0; y < canvas.height; y += 80) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // ---- Draw branch connection lines ----
+            gitData.commits.forEach(commit => {
+                if (!commit.position || !commit.parents) return;
+                const parents = commit.parents.split(' ').filter(Boolean);
+                parents.forEach(parentSha => {
+                    const parent = commitBySha[parentSha];
+                    if (!parent || !parent.position) return;
+
+                    const cx = commit.position.x + windOffset(commit.position.x, commit.position.y, frame);
+                    const cy = commit.position.y;
+                    const px = parent.position.x + windOffset(parent.position.x, parent.position.y, frame);
+                    const py = parent.position.y;
+
+                    const colour = laneColour(commit.position.lane);
+                    const isHighlighted = ancestryHighlight && ancestryHighlight.has(commit.sha) && ancestryHighlight.has(parentSha);
+
+                    ctx.strokeStyle = isHighlighted ? colour : (colour + '40');
+                    ctx.lineWidth = isHighlighted ? 2.5 : 1.5;
+
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+
+                    if (commit.position.lane !== parent.position.lane) {
+                        // Curved branch/merge line
+                        const cpx1 = cx;
+                        const cpy1 = cy + (py - cy) * 0.4;
+                        const cpx2 = px;
+                        const cpy2 = cy + (py - cy) * 0.6;
+                        ctx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, px, py);
+                    } else {
+                        // Straight trunk line
+                        ctx.lineTo(px, py);
+                    }
+                    ctx.stroke();
+                });
+            });
+
+            // ---- Draw commit nodes (leaves) ----
+            gitData.commits.forEach(commit => {
+                if (!commit.position) return;
+                const pos = commit.position;
+                const isHovered = hoveredCommit === commit;
+                const isSelected = selectedCommit === commit;
+                const isInAncestry = ancestryHighlight && ancestryHighlight.has(commit.sha);
+                const hasTags = tagsBySha[commit.sha];
+                const hasBranch = branchBySha[commit.sha];
+
+                // Wind wobble on leaves
+                const wobble = windOffset(pos.x, pos.y, frame);
+                const x = pos.x + wobble;
+                const y = pos.y;
+
+                let baseRadius = pos.radius || 6;
+                if (hasTags) baseRadius = Math.max(baseRadius, 9);
+                const radius = isHovered ? baseRadius * 1.8 : (isSelected ? baseRadius * 1.5 : baseRadius);
+
+                // Choose colour
+                let fillColour;
+                if (hasTags) fillColour = '#38bdf8';
+                else if (pos.is_merge) fillColour = '#c084fc';
+                else if (pos.is_fork) fillColour = '#fb923c';
+                else fillColour = laneColour(pos.lane);
+
+                const dimmed = ancestryHighlight && !isInAncestry;
+                const alpha = dimmed ? 0.15 : 1;
+
+                // Glow for hovered/selected
+                if ((isHovered || isSelected) && !dimmed) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.25;
+                    ctx.shadowColor = fillColour;
+                    ctx.shadowBlur = 20;
+                    ctx.fillStyle = fillColour;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius * 2.2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // Leaf shape: draw a tiny leaf silhouette for non-merge commits
+                ctx.save();
+                ctx.globalAlpha = alpha;
+
+                if (!pos.is_merge && !hasTags && animationEnabled) {
+                    // Organic leaf shape
+                    const leafAngle = Math.sin(frame * 0.025 + pos.x * 0.01) * 0.3 + wobble * 0.05;
+                    ctx.save();
+                    ctx.translate(x, y);
+                    ctx.rotate(leafAngle);
+
+                    // Leaf body
+                    ctx.beginPath();
+                    ctx.moveTo(0, -radius * 1.2);
+                    ctx.bezierCurveTo(radius * 0.8, -radius * 0.4, radius * 0.8, radius * 0.6, 0, radius * 1.2);
+                    ctx.bezierCurveTo(-radius * 0.8, radius * 0.6, -radius * 0.8, -radius * 0.4, 0, -radius * 1.2);
+                    ctx.fillStyle = fillColour;
+                    ctx.fill();
+
+                    // Leaf vein
+                    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                    ctx.lineWidth = 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -radius * 0.8);
+                    ctx.lineTo(0, radius * 0.8);
+                    ctx.stroke();
+
+                    ctx.restore();
+                } else {
+                    // Circle for merges, tags, or when animation is off
+                    const grad = ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.3, 0, x, y, radius);
+                    grad.addColorStop(0, fillColour);
+                    grad.addColorStop(1, fillColour + 'aa');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Outline
+                    ctx.strokeStyle = isHovered ? '#fbbf24' : 'rgba(255,255,255,0.15)';
+                    ctx.lineWidth = isHovered ? 2 : 1;
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+
+                // Tag/branch labels
+                if (!dimmed && (hasTags || hasBranch)) {
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    const labels = [];
+                    if (hasTags) hasTags.forEach(t => labels.push({ text: '🏷 ' + t, colour: '#38bdf8' }));
+                    if (hasBranch) hasBranch.forEach(b => labels.push({ text: '⎇ ' + b, colour: '#34d399' }));
+
+                    labels.forEach((lbl, li) => {
+                        const lx = x + radius + 8;
+                        const ly = y + 4 + li * 16;
+                        ctx.font = 'bold 10px system-ui, sans-serif';
+                        const metrics = ctx.measureText(lbl.text);
+                        // Label background
+                        ctx.fillStyle = 'rgba(10, 10, 30, 0.85)';
+                        ctx.beginPath();
+                        ctx.roundRect(lx - 4, ly - 11, metrics.width + 8, 15, 3);
+                        ctx.fill();
+                        ctx.fillStyle = lbl.colour;
+                        ctx.fillText(lbl.text, lx, ly);
+                    });
+                    ctx.restore();
+                }
+            });
+
+            if (animationEnabled) {
+                frame++;
+                requestAnimationFrame(drawTree);
+            }
+        }
+
+        // Handle mouse movement for tooltip — positioned close to cursor
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            // Account for scroll within viewport
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            const mouseY = (e.clientY - rect.top) * scaleY;
+
+            let found = null;
+            let bestDist = Infinity;
+            gitData.commits.forEach(commit => {
+                if (!commit.position) return;
+                const wx = windOffset(commit.position.x, commit.position.y, frame);
+                const dx = mouseX - (commit.position.x + wx);
+                const dy = mouseY - commit.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const hitRadius = Math.max((commit.position.radius || 6) * 2, 12);
+                if (distance < hitRadius && distance < bestDist) {
+                    bestDist = distance;
+                    found = commit;
+                }
+            });
+
+            if (found !== hoveredCommit) {
+                hoveredCommit = found;
+                if (!animationEnabled) drawTree();
+            }
+
+            if (hoveredCommit) {
+                tooltip.querySelector('.tooltip-sha').textContent = hoveredCommit.short;
+                tooltip.querySelector('.tooltip-msg').textContent = hoveredCommit.subject;
+                tooltip.querySelector('.tooltip-author').textContent = `by ${hoveredCommit.author}`;
+                tooltip.querySelector('.tooltip-date').textContent = new Date(hoveredCommit.date).toLocaleString();
+
+                const refs = [];
+                if (tagsBySha[hoveredCommit.sha]) refs.push(...tagsBySha[hoveredCommit.sha].map(t => '🏷 ' + t));
+                if (branchBySha[hoveredCommit.sha]) refs.push(...branchBySha[hoveredCommit.sha].map(b => '⎇ ' + b));
+                tooltip.querySelector('.tooltip-refs').textContent = refs.join('  ');
+
+                // Position tooltip near cursor but keep within viewport
+                let tx = e.clientX + 16;
+                let ty = e.clientY + 16;
+                const tw = tooltip.offsetWidth || 300;
+                const th = tooltip.offsetHeight || 100;
+                if (tx + tw > window.innerWidth - 10) tx = e.clientX - tw - 16;
+                if (ty + th > window.innerHeight - 10) ty = e.clientY - th - 16;
+                if (tx < 10) tx = 10;
+                if (ty < 10) ty = 10;
+                tooltip.style.left = tx + 'px';
+                tooltip.style.top = ty + 'px';
+                tooltip.classList.add('visible');
+            } else {
+                tooltip.classList.remove('visible');
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoveredCommit = null;
+            tooltip.classList.remove('visible');
+            if (!animationEnabled) drawTree();
+        });
+
+        // Click to highlight ancestry; Ctrl+click or middle-click opens commit page
+        const repoUrl = (gitData.metadata && gitData.metadata.repo_url) || '';
+        canvas.addEventListener('click', (e) => {
+            if (hoveredCommit) {
+                if (e.ctrlKey || e.metaKey) {
+                    // Open commit page in new tab
+                    if (repoUrl) {
+                        window.open(repoUrl + '/commit/' + hoveredCommit.sha, '_blank', 'noopener');
+                    }
+                    return;
+                }
+                if (selectedCommit === hoveredCommit) {
+                    selectedCommit = null;
+                    ancestryHighlight = null;
+                } else {
+                    selectedCommit = hoveredCommit;
+                    ancestryHighlight = getAncestry(hoveredCommit);
+                }
+            } else {
+                selectedCommit = null;
+                ancestryHighlight = null;
+            }
+            if (!animationEnabled) drawTree();
+        });
+
+        canvas.addEventListener('auxclick', (e) => {
+            if (e.button === 1 && hoveredCommit && repoUrl) {
+                e.preventDefault();
+                window.open(repoUrl + '/commit/' + hoveredCommit.sha, '_blank', 'noopener');
+            }
+        });
+
+        function resetView() {
+            frame = 0;
+            hoveredCommit = null;
+            selectedCommit = null;
+            ancestryHighlight = null;
+            viewport.scrollTop = 0;
+            drawTree();
+        }
+
+        function toggleAnimation() {
+            animationEnabled = !animationEnabled;
+            if (animationEnabled) drawTree();
+        }
+
+        function toggleWind() {
+            windEnabled = !windEnabled;
+            if (!animationEnabled) drawTree();
+        }
+
+        // Initial draw
+        drawTree();
+    </script>
+</body>
+</html>
