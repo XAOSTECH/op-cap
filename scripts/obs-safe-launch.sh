@@ -564,6 +564,38 @@ probe_sandbox_support() {
   fi
 }
 
+# Deauthorize the capture device at the USB level so the kernel driver releases it entirely.
+# More thorough than the LD_PRELOAD shim alone: prevents uvcvideo from holding the device
+# and removes it from the active USB graph while OBS is running in --no-device mode.
+USB_DEAUTH_SYS=""
+usb_deauthorize_device() {
+  local _vp="${USB_CAPTURE_VIDPID:-${VIDPID:-}}"
+  [ -n "$_vp" ] || return 0
+  local _v=${_vp%:*} _p=${_vp#*:}
+  local _sys
+  _sys=$(for _d in /sys/bus/usb/devices/*/idVendor; do
+    _dir=$(dirname "$_d")
+    [ "$(cat "$_dir/idVendor" 2>/dev/null)" = "$_v" ] || continue
+    [ "$(cat "$_dir/idProduct" 2>/dev/null)" = "$_p" ] || continue
+    echo "$_dir"; break
+  done)
+  [ -n "$_sys" ] || { log_warn "--no-device: USB device $_vp not found in sysfs, skipping deauthorize"; return 0; }
+  USB_DEAUTH_SYS="$_sys"
+  if echo 0 | sudo tee "$_sys/authorized" >/dev/null 2>&1; then
+    log_ok "--no-device: USB device $_vp deauthorized (kernel driver released)"
+  else
+    log_warn "--no-device: could not deauthorize $_vp (may need root or kernel support)"
+    USB_DEAUTH_SYS=""
+  fi
+}
+
+usb_reauthorize_device() {
+  [ -n "$USB_DEAUTH_SYS" ] || return 0
+  echo 1 | sudo tee "$USB_DEAUTH_SYS/authorized" >/dev/null 2>&1 || true
+  log_info "USB device reauthorized: $USB_DEAUTH_SYS"
+  USB_DEAUTH_SYS=""
+}
+
 setup_no_v4l2_preload() {
   if [ "$SKIP_DEVICE_CHECK" -ne 1 ]; then
     return 0
@@ -578,6 +610,7 @@ setup_no_v4l2_preload() {
       export LD_PRELOAD="$prebuilt"
     fi
     log_info "--no-device: V4L2 device hide shim active (pre-built)"
+    usb_deauthorize_device
     local obs_real
     obs_real=$(readlink -f "$(command -v obs 2>/dev/null)" 2>/dev/null || true)
     if [[ "$obs_real" == /snap/* ]]; then
@@ -984,6 +1017,7 @@ cleanup() {
   log_info "Cleaning up..."
   stop_feed
   stop_auto_reconnect
+  usb_reauthorize_device
   # Unload all virtual audio modules and revert OBS profile ini
   if command -v pactl >/dev/null 2>&1; then
     pactl list modules short 2>/dev/null | awk '/module-virtual-source/ && /capture_card_loop/      {print $1}' | xargs -r -I{} pactl unload-module {} 2>/dev/null || true
