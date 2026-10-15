@@ -26,9 +26,7 @@ HDR_MODE=${USB_CAPTURE_HDR_MODE:-2}
 # Only change to yuv420p if your loopback consumer cannot handle NV12
 OUTPUT_PIX_FMT=${USB_CAPTURE_OUTPUT_PIX_FMT:-nv12}
 
-# LD_PRELOAD shim: patches VIDIOC_S_FMT colorspace to BT.2020/PQ when FFmpeg opens
-# the loopback output device. This is the only way to get the correct colorspace
-# into v4l2loopback — FFmpeg's v4l2 muxer always writes colorspace=0 (sRGB).
+# LD_PRELOAD shim: patches VIDIOC_S_FMT colorspace to BT.2020/PQ when FFmpeg opens the loopback output device. This is the only way to get the correct colorspace into v4l2loopback — FFmpeg's v4l2 muxer always writes colorspace=0 (sRGB).
 _SHIM_SO="$(cd "$(dirname "$0")/.." && pwd)/src/v4l2-hdr-shim.so"
 FFMPEG_LD_PRELOAD=""
 if [ -f "$_SHIM_SO" ]; then
@@ -145,8 +143,7 @@ esac
 echo "Starting FFmpeg: $IN -> $OUT at ${VID_SIZE}@${FPS}fps (format: ${INPUT_FORMAT}, out: ${OUTPUT_PIX_FMT})"
 
 # MJPG: decode then re-encode to clean MJPEG so the loopback presents native MJPG.
-# Decoding absorbs hardware corruption; re-encoding always produces a well-formed
-# output frame regardless of what the physical device sent.
+# Decoding absorbs hardware corruption; re-encoding always produces a well-formed output frame regardless of what the physical device sent.
 if [ "$INPUT_FORMAT" = "MJPG" ] && [ -z "$FILTERS" ] && [ -z "$OVERLAY_FILE" ]; then
   echo "  Mode: MJPG decode → MJPEG re-encode (native MJPG in loopback, corruption absorbed)"
   ffmpeg -hide_banner -loglevel info \
