@@ -171,8 +171,7 @@ check_usb_device() {
 }
 
 # Check v4l2loopback is loaded
-# exclusive_caps=0: allows both writer (feed.sh) and readers (OBS) simultaneously
-# exclusive_caps=1 would block reading while writing - wrong for our use case
+# exclusive_caps=0: allows both writer (feed.sh) and readers (OBS) simultaneously exclusive_caps=1 would block reading while writing - wrong for our use case
 ## Scan /sys for any v4l2loopback virtual video device; prints /dev/videoN or empty
 _find_loopback_dev() {
   local sysdev
@@ -565,8 +564,7 @@ probe_sandbox_support() {
 }
 
 # Deauthorize the capture device at the USB level so the kernel driver releases it entirely.
-# More thorough than the LD_PRELOAD shim alone: prevents uvcvideo from holding the device
-# and removes it from the active USB graph while OBS is running in --no-device mode.
+# More thorough than the LD_PRELOAD shim alone: prevents uvcvideo from holding the device and removes it from the active USB graph while OBS is running in --no-device mode.
 USB_DEAUTH_SYS=""
 usb_deauthorize_device() {
   local _vp="${USB_CAPTURE_VIDPID:-${VIDPID:-}}"
@@ -725,8 +723,7 @@ EOF
   fi
 }
 
-# Run OBS process. In --no-device mode, prefer a process-level device sandbox
-# so OBS cannot enumerate /dev/video* even if it probes hardware globally.
+# Run OBS process. In --no-device mode, prefer a process-level device sandbox so OBS cannot enumerate /dev/video* even if it probes hardware globally.
 run_obs() {
   if [ "$SKIP_DEVICE_CHECK" -eq 1 ]; then
     probe_sandbox_support
@@ -745,8 +742,7 @@ run_obs() {
     log_warn "--no-device: using standard launch fallback"
   fi
 
-  # In loopback mode, hide the physical capture device so OBS cannot fall back
-  # to reading it directly when the loopback stalls (which blocks the FFmpeg reader).
+  # In loopback mode, hide the physical capture device so OBS cannot fall back to reading it directly when the loopback stalls (which blocks the FFmpeg reader).
   if [ "$USE_LOOPBACK" -eq 1 ] && [ -n "${DEVICE:-}" ]; then
     local _shim="$BASEDIR/src/hide_v4l2.so"
     if [ -f "$_shim" ]; then
@@ -901,9 +897,7 @@ main() {
     log_info "OBS should NOT be configured to open $DEVICE directly"
 
     # Re-patch scene sources to the loopback device on every launch.
-    # OBS writes device_id back to whatever it last used on exit, so this must run
-    # each time. Also clears pixelformat so OBS auto-negotiates with the loopback
-    # rather than trying to match the physical device's saved format.
+    # OBS writes device_id back to whatever it last used on exit, so this must run each time. Also clears pixelformat so OBS auto-negotiates with the loopback rather than trying to match the physical device's saved format.
     local _obs_scenes="${HOME}/.config/obs-studio/basic/scenes"
     if command -v jq >/dev/null 2>&1 && [ -d "$_obs_scenes" ]; then
       for _fp in "$_obs_scenes"/*.json; do
