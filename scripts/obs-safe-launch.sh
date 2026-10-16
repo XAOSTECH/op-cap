@@ -960,7 +960,11 @@ main() {
           _n=$(echo "$_line" | grep -oE '[0-9]+' | tail -1)
           [ "${_n:-0}" -lt 1000 ] && continue
           touch "$_sentinel"
-          pkill -TERM -f 'obs.*--safe-mode' 2>/dev/null || pkill -TERM obs 2>/dev/null || true
+          _obs_pid=$(pgrep -n -f 'obs.*--safe-mode' 2>/dev/null || pgrep -n obs 2>/dev/null || echo "")
+          [ -n "$_obs_pid" ] && kill -TERM "$_obs_pid" 2>/dev/null || true
+          sleep 5
+          # Force-kill only the specific PID - a restarted OBS will have a different PID and is safe
+          [ -n "$_obs_pid" ] && kill -KILL "$_obs_pid" 2>/dev/null || true
           sleep 8
           ;;
       esac
