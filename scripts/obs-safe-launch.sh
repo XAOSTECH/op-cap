@@ -18,6 +18,9 @@ SKIP_DEVICE_CHECK=0
 LOG_DIR="${HOME}/.cache/obs-safe-launch"
 LOG_FILE="$LOG_DIR/obs-crash-$(date +%Y%m%d_%H%M%S).log"
 PID_FILE="/tmp/obs-safe-launch-monitor.pid"
+# Stores original global.ini ConfirmOnExit value so cleanup can restore it
+OBS_GLOBAL_INI="${HOME}/.config/obs-studio/global.ini"
+OBS_CONFIRM_ORIG=""
 FEED_PID_FILE="/tmp/obs-safe-launch-feed.pid"
 AUDIO_ROUTER_PID_FILE="/tmp/obs-safe-launch-audio-router.pid"
 STREAM_STATE_FILE="/tmp/obs-safe-launch-streaming.state"
@@ -725,6 +728,10 @@ EOF
 
 # Run OBS process. In --no-device mode, prefer a process-level device sandbox so OBS cannot enumerate /dev/video* even if it probes hardware globally.
 run_obs() {
+  # --startstreaming is silently ignored by OBS when --safe-mode is active (source: LoadData guard)
+  local _safe_flag="--safe-mode"
+  [[ "${OBS_ARGS:-}" =~ "--startstreaming" ]] && _safe_flag=""
+
   if [ "$SKIP_DEVICE_CHECK" -eq 1 ]; then
     probe_sandbox_support
     if [ "$SANDBOX_SUPPORTED" -eq 1 ]; then
@@ -735,7 +742,7 @@ run_obs() {
         --property=ProtectControlGroups=yes \
         --property=ProtectKernelTunables=yes \
         --quiet \
-        obs --safe-mode --disable-missing-files-check $OBS_ARGS
+        obs $_safe_flag --disable-missing-files-check $OBS_ARGS
       return $?
     fi
 
@@ -748,12 +755,12 @@ run_obs() {
     if [ -f "$_shim" ]; then
       local _preload="${LD_PRELOAD:+$LD_PRELOAD:}$_shim"
       HIDE_V4L2_DEVICE="$DEVICE" LD_PRELOAD="$_preload" \
-        obs --safe-mode --disable-missing-files-check $OBS_ARGS
+        obs $_safe_flag --disable-missing-files-check $OBS_ARGS
       return $?
     fi
   fi
 
-  obs --safe-mode --disable-missing-files-check $OBS_ARGS
+  obs $_safe_flag --disable-missing-files-check $OBS_ARGS
 }
 
 # Check if OBS was streaming via websocket or log file
@@ -960,17 +967,21 @@ main() {
           _n=$(echo "$_line" | grep -oE '[0-9]+' | tail -1)
           [ "${_n:-0}" -lt 1000 ] && continue
           touch "$_sentinel"
-          _obs_pid=$(pgrep -n -f 'obs.*--safe-mode' 2>/dev/null || pgrep -n obs 2>/dev/null || echo "")
+          _obs_pid=$(pgrep -n -f 'obs.*--disable-missing-files-check' 2>/dev/null || pgrep -xn obs 2>/dev/null || echo "")
           [ -n "$_obs_pid" ] && kill -TERM "$_obs_pid" 2>/dev/null || true
-          sleep 5
-          # Force-kill only the specific PID - a restarted OBS will have a different PID and is safe
-          [ -n "$_obs_pid" ] && kill -KILL "$_obs_pid" 2>/dev/null || true
           sleep 8
           ;;
       esac
     done ) &
   echo $! >> "$PID_FILE"
   echo ""
+
+  # Disable OBS streaming confirm dialog so SIGTERM exits cleanly; restored in cleanup
+  if [ -f "$OBS_GLOBAL_INI" ]; then
+    OBS_CONFIRM_ORIG=$(awk -F= '/^\[General\]/{g=1} /^\[/{if(!/^\[General\]/)g=0} g && /^ConfirmOnExit=/{print $2;exit}' "$OBS_GLOBAL_INI" 2>/dev/null)
+    sed -i '/^\[General\]/,/^\[/{s/^ConfirmOnExit=.*/ConfirmOnExit=false/}' "$OBS_GLOBAL_INI" 2>/dev/null || true
+    grep -q '^ConfirmOnExit=' "$OBS_GLOBAL_INI" 2>/dev/null || sed -i '/^\[General\]/a ConfirmOnExit=false' "$OBS_GLOBAL_INI" 2>/dev/null || true
+  fi
 
   # Main loop: launch OBS, restart on crash
   while [ "$STOP_REQUESTED" -eq 0 ]; do
@@ -1017,6 +1028,14 @@ cleanup() {
   stop_auto_reconnect
   usb_reauthorize_device
   # Unload all virtual audio modules and revert OBS profile ini
+  # Restore ConfirmOnExit in global.ini
+  if [ -f "$OBS_GLOBAL_INI" ]; then
+    if [ -n "$OBS_CONFIRM_ORIG" ]; then
+      sed -i "/^\[General\]/,/^\[/{s/^ConfirmOnExit=.*/ConfirmOnExit=${OBS_CONFIRM_ORIG}/}" "$OBS_GLOBAL_INI" 2>/dev/null || true
+    else
+      sed -i '/^\[General\]/,/^\[/{/^ConfirmOnExit=false$/d}' "$OBS_GLOBAL_INI" 2>/dev/null || true
+    fi
+  fi
   if command -v pactl >/dev/null 2>&1; then
     pactl list modules short 2>/dev/null | awk '/module-virtual-source/ && /capture_card_loop/      {print $1}' | xargs -r -I{} pactl unload-module {} 2>/dev/null || true
     pactl list modules short 2>/dev/null | awk '/module-loopback/       && /capture_card_loop/      {print $1}' | xargs -r -I{} pactl unload-module {} 2>/dev/null || true
