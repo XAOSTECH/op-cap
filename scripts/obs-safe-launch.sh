@@ -922,6 +922,8 @@ main() {
       if systemctl is-active --quiet usb-capture-ffmpeg.service 2>/dev/null; then
         log_warn "Stopping usb-capture-ffmpeg.service to free $DEVICE for direct access..."
         sudo systemctl stop usb-capture-ffmpeg.service 2>/dev/null || true
+        # Stop monitor service too - it would otherwise auto-restart ffmpeg, creating the loopback device
+        sudo systemctl stop usb-capture-monitor.service 2>/dev/null || true
         STOPPED_SERVICE=1
         sleep 2
       fi
@@ -978,14 +980,30 @@ main() {
 
   # Disable OBS streaming confirm dialog so SIGTERM exits cleanly; restored in cleanup
   if [ -f "$OBS_GLOBAL_INI" ]; then
-    OBS_CONFIRM_ORIG=$(awk -F= '/^\[General\]/{g=1} /^\[/{if(!/^\[General\]/)g=0} g && /^ConfirmOnExit=/{print $2;exit}' "$OBS_GLOBAL_INI" 2>/dev/null)
-    sed -i '/^\[General\]/,/^\[/{s/^ConfirmOnExit=.*/ConfirmOnExit=false/}' "$OBS_GLOBAL_INI" 2>/dev/null || true
-    grep -q '^ConfirmOnExit=' "$OBS_GLOBAL_INI" 2>/dev/null || sed -i '/^\[General\]/a ConfirmOnExit=false' "$OBS_GLOBAL_INI" 2>/dev/null || true
+    OBS_CONFIRM_ORIG=$(grep '^ConfirmOnExit=' "$OBS_GLOBAL_INI" | head -1 | cut -d= -f2-)
+    # Remove any existing key and insert false immediately after [General]
+    sed -i '/^ConfirmOnExit=/d' "$OBS_GLOBAL_INI" 2>/dev/null || true
+    sed -i 's/^\[General\]$/[General]\nConfirmOnExit=false/' "$OBS_GLOBAL_INI" 2>/dev/null || true
   fi
 
   # Main loop: launch OBS, restart on crash
   while [ "$STOP_REQUESTED" -eq 0 ]; do
     export GSETTINGS_SCHEMA_DIR=/usr/share/glib-2.0/schemas
+    # Re-resolve device path in case USB re-enumerated on a different minor number
+    if [ "$USE_LOOPBACK" -eq 0 ] && [ -n "${USB_CAPTURE_VIDEO:-}" ]; then
+      _newdev=$(readlink -f "${USB_CAPTURE_VIDEO}" 2>/dev/null || true)
+      if [ -c "${_newdev:-}" ] && [ "${_newdev}" != "$DEVICE" ]; then
+        log_info "Device re-enumerated: $DEVICE -> $_newdev"
+        DEVICE="$_newdev"
+        local _obs_scenes="${HOME}/.config/obs-studio/basic/scenes"
+        if command -v jq >/dev/null 2>&1 && [ -d "$_obs_scenes" ]; then
+          for _fp in "$_obs_scenes"/*.json; do
+            [ -f "$_fp" ] || continue
+            jq --arg dev "$DEVICE" '.sources |= map(if .id == "v4l2_input" and ((.settings.device_id // "") | startswith("/dev/")) then .settings.device_id = $dev | .settings.pixelformat = 0 else . end)' "$_fp" > "${_fp}.tmp" 2>/dev/null && mv "${_fp}.tmp" "$_fp" || rm -f "${_fp}.tmp"
+          done
+        fi
+      fi
+    fi
 
     set +e  # Disable exit-on-error for OBS execution
     run_obs 2>&1 | tee -a "$LOG_FILE"
@@ -1053,6 +1071,7 @@ cleanup() {
   if [ "$STOPPED_SERVICE" -eq 1 ]; then
     log_info "Restarting usb-capture-ffmpeg.service..."
     sudo systemctl start usb-capture-ffmpeg.service 2>/dev/null || true
+    sudo systemctl start usb-capture-monitor.service 2>/dev/null || true
   fi
   if [ -n "${ISOLATED_CONFIG_DIR:-}" ] && [ -d "$ISOLATED_CONFIG_DIR" ]; then
     rm -rf "$ISOLATED_CONFIG_DIR" || true
