@@ -958,13 +958,21 @@ main() {
   # Threshold: ignore stops < 1000 frames (device settings changes take only a few frames).
   local _sentinel="/tmp/obs-safe-launch-capture-restart"
   ( tail -n 0 -F "$LOG_FILE" 2>/dev/null | \
-    grep --line-buffered -E "Stopped capture after|==== Streaming Start|User stopped the stream" | \
+    grep --line-buffered -E "Stopped capture after|==== Streaming Start|==== Streaming Stop|User stopped the stream" | \
     while IFS= read -r _line; do
       case "$_line" in
         *"==== Streaming Start"*)
           echo 1 > "$STREAM_STATE_FILE" ;;
         *"User stopped the stream"*)
           rm -f "$STREAM_STATE_FILE" ;;
+        *"==== Streaming Stop"*)
+          # Unexpected stream stop (no User-stopped-stream event preceded it)
+          [ -f "$STREAM_STATE_FILE" ] || continue
+          touch "$_sentinel"
+          _obs_pid=$(pgrep -n -f 'obs.*--disable-missing-files-check' 2>/dev/null || pgrep -xn obs 2>/dev/null || echo "")
+          [ -n "$_obs_pid" ] && kill -TERM "$_obs_pid" 2>/dev/null || true
+          sleep 8
+          ;;
         *"Stopped capture after"*)
           _n=$(echo "$_line" | grep -oE '[0-9]+' | tail -1)
           [ "${_n:-0}" -lt 1000 ] && continue
