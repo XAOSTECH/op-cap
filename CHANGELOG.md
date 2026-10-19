@@ -1,4 +1,25 @@
 
+## [0.1.2] - 2026-10-19 (re-release)
+
+### Added
+- USB deauthorize capture device in --no-device mode
+
+### Fixed
+- fix stream auto-resume, eliminate SIGKILL cascade, remove dialogs
+- restore PID-specific SIGKILL to bypass streaming confirm dialog
+- remove SIGKILL fallback that was killing restarted OBS
+- persist streaming state across OBS restarts; force-kill on dialog block
+- threshold and proper restart on capture loss
+- kill and restart OBS on capture source loss
+- reliable disconnect detection and USB reset
+- use stored best format FourCC in --no-loopback scene patch
+- auto-install all required packages, never prompt the user
+- handle reconnects in --no-loopback mode
+
+### Changed
+- chore: humanise hard-wrapped comments and prose
+- chore(dc-init): update workflows,actions
+
 ## [0.1.2] - 2026-10-05
 
 ### Fixed
