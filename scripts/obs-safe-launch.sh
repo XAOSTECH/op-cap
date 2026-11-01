@@ -986,7 +986,7 @@ main() {
   echo $! >> "$PID_FILE"
   echo ""
 
-  # Disable OBS streaming confirm dialog so SIGTERM exits cleanly; restored in cleanup
+  # Disable OBS streaming confirm dialogue so SIGTERM exits cleanly; restored in cleanup
   if [ -f "$OBS_GLOBAL_INI" ]; then
     OBS_CONFIRM_ORIG=$(grep '^ConfirmOnExit=' "$OBS_GLOBAL_INI" | head -1 | cut -d= -f2-)
     # Remove any existing key and insert false immediately after [General]

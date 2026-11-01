@@ -5,10 +5,10 @@
 - USB deauthorize capture device in --no-device mode
 
 ### Fixed
-- fix stream auto-resume, eliminate SIGKILL cascade, remove dialogs
-- restore PID-specific SIGKILL to bypass streaming confirm dialog
+- fix stream auto-resume, eliminate SIGKILL cascade, remove dialogues
+- restore PID-specific SIGKILL to bypass streaming confirm dialogue
 - remove SIGKILL fallback that was killing restarted OBS
-- persist streaming state across OBS restarts; force-kill on dialog block
+- persist streaming state across OBS restarts; force-kill on dialogue block
 - threshold and proper restart on capture loss
 - kill and restart OBS on capture source loss
 - reliable disconnect detection and USB reset
