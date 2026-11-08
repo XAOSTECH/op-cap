@@ -737,8 +737,7 @@ EOF
 
 # Run OBS process. In --no-device mode, prefer a process-level device sandbox so OBS cannot enumerate /dev/video* even if it probes hardware globally.
 run_obs() {
-  # Safe-mode flag is determined by the caller (main loop) so it is set in the parent shell
-  # rather than a pipe subshell, which cannot propagate variable writes back to the parent.
+  # Safe-mode flag is determined by the caller (main loop) so it is set in the parent shell rather than a pipe subshell, which cannot propagate variable writes back to the parent.
   local _safe_flag="${1:---safe-mode}"
   # --startstreaming is silently ignored by OBS when --safe-mode is active (source: LoadData guard).
   [[ "${OBS_ARGS:-}" =~ "--startstreaming" ]] && _safe_flag=""
@@ -1014,8 +1013,7 @@ main() {
 
   # Disable OBS exit-confirmation dialogs so SIGTERM always exits cleanly; restored in cleanup.
   # ConfirmOnExit ([General]) suppresses the general quit prompt.
-  # WarnBeforeStoppingStream ([BasicWindow]) suppresses the "stream is active" blocking dialog
-  # which is the main cause of SIGTERM being ignored when OBS is streaming.
+  # WarnBeforeStoppingStream ([BasicWindow]) suppresses the "stream is active" blocking dialog which is the main cause of SIGTERM being ignored when OBS is streaming.
   if [ -f "$OBS_GLOBAL_INI" ]; then
     OBS_CONFIRM_ORIG=$(grep '^ConfirmOnExit=' "$OBS_GLOBAL_INI" | head -1 | cut -d= -f2-) || true
     sed -i '/^ConfirmOnExit=/d' "$OBS_GLOBAL_INI" 2>/dev/null || true
@@ -1033,11 +1031,8 @@ main() {
   while [ "$STOP_REQUESTED" -eq 0 ]; do
     export GSETTINGS_SCHEMA_DIR=/usr/share/glib-2.0/schemas
     # Re-resolve device path in case USB re-enumerated on a different minor number.
-    # After a reconnect (SAFE_MODE_OVERRIDE=1) also wait briefly for udev to settle and
-    # the v4l2 driver to become responsive before OBS opens the device — this prevents
-    # OBS from grabbing the device before it has finished enumerating, which causes it to
-    # either select the wrong device or show a connection/initialisation graphic from the
-    # capture card.
+    # After a reconnect (SAFE_MODE_OVERRIDE=1) also wait briefly for udev to settle and the v4l2 driver to become responsive before OBS opens the device — this prevents
+    # OBS from grabbing the device before it has finished enumerating, which causes it to either select the wrong device or show a connection/initialisation graphic from the capture card.
     if [ "$USE_LOOPBACK" -eq 0 ] && [ -n "${USB_CAPTURE_VIDEO:-}" ]; then
       _newdev=$(readlink -f "${USB_CAPTURE_VIDEO}" 2>/dev/null || true)
       if [ -c "${_newdev:-}" ] && [ "${_newdev}" != "$DEVICE" ]; then
@@ -1064,8 +1059,7 @@ main() {
 
     # Determine whether to pass --safe-mode to OBS this iteration.
     # SAFE_MODE_OVERRIDE=1 means the wrapper killed OBS intentionally (reconnect / capture-loss);
-    # genuine crashes use full safe mode. Reset here (parent shell) so the subshell spawned by
-    # the pipeline below inherits the computed value and writes don't need to propagate back.
+    # genuine crashes use full safe mode. Reset here (parent shell) so the subshell spawned by the pipeline below inherits the computed value and writes don't need to propagate back.
     local _this_safe_flag="--safe-mode"
     [ "${SAFE_MODE_OVERRIDE:-0}" -eq 1 ] && _this_safe_flag=""
     SAFE_MODE_OVERRIDE=0  # reset before run_obs so sentinel check can re-arm it for the next restart
@@ -1078,8 +1072,7 @@ main() {
     log_info "OBS exited with code: $EXIT_CODE"
 
     # Treat capture-source-loss / reconnect kills (SIGTERM from wrapper) the same as crashes.
-    # Also set SAFE_MODE_OVERRIDE so the next launch skips --safe-mode (intentional restarts
-    # don't need safe mode; genuine crashes do).
+    # Also set SAFE_MODE_OVERRIDE so the next launch skips --safe-mode (intentional restarts don't need safe mode; genuine crashes do).
     if [ -f "$CAPTURE_RESTART_SENTINEL" ]; then
       rm -f "$CAPTURE_RESTART_SENTINEL"
       EXIT_CODE=1
