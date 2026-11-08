@@ -102,8 +102,7 @@ while true; do
     # Restart the capture pipeline
     if [ "$RESTART_OBS" -eq 1 ]; then
       # Wait for a v4l2 device associated with the VID:PID to reappear, max 4 s.
-      # We scan by VID:PID rather than the original /dev/videoN name because USB
-      # re-enumeration can produce a different minor number after a reset.
+      # We scan by VID:PID rather than the original /dev/videoN name because USB re-enumeration can produce a different minor number after a reset.
       _w=0
       _found_devname=""
       while [ "$_w" -lt 4 ] && [ -z "$_found_devname" ]; do
@@ -126,8 +125,7 @@ while true; do
       else
         echo "Device did not reappear within 4s — signalling OBS to restart anyway" >&2
       fi
-      # Let the obs-safe-launch wrapper know this is an intentional restart so it can
-      # skip --safe-mode and use a shorter recovery timeout.
+      # Let the obs-safe-launch wrapper know this is an intentional restart so it can skip --safe-mode and use a shorter recovery timeout.
       [ -n "$RESTART_SENTINEL" ] && { touch "$RESTART_SENTINEL" 2>/dev/null || true; }
       # Kill OBS — match broadly regardless of whether --safe-mode is currently active
       echo "Signalling OBS to restart (device ${DEVNODE} $( [ -n "$_found_devname" ] && echo 'back' || echo 'still absent'))..." >&2
