@@ -133,7 +133,7 @@ while true; do
       if [ -n "$_obs_pid" ]; then
         kill -TERM "$_obs_pid" 2>/dev/null || true
         sleep 1
-        # Force-kill if still alive (e.g. streaming-confirm dialog showed up despite ini flag)
+        # Force-kill if still alive (e.g. streaming-confirm dialogue showed up despite ini flag)
         kill -0 "$_obs_pid" 2>/dev/null && kill -KILL "$_obs_pid" 2>/dev/null || true
       fi
     elif [ -f "$(dirname "$0")/../ffmpeg/feed.sh" ]; then

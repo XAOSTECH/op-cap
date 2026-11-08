@@ -989,7 +989,7 @@ main() {
           if [ -n "$_obs_pid" ]; then
             kill -TERM "$_obs_pid" 2>/dev/null || true
             sleep 2
-            # SIGKILL if the streaming-confirm dialog or anything else is still blocking exit
+            # SIGKILL if the streaming-confirm dialogue or anything else is still blocking exit
             kill -0 "$_obs_pid" 2>/dev/null && kill -KILL "$_obs_pid" 2>/dev/null || true
           fi
           sleep 5  # debounce: suppress duplicate events while OBS restarts
@@ -1011,9 +1011,9 @@ main() {
   echo $! >> "$PID_FILE"
   echo ""
 
-  # Disable OBS exit-confirmation dialogs so SIGTERM always exits cleanly; restored in cleanup.
+  # Disable OBS exit-confirmation dialogues so SIGTERM always exits cleanly; restored in cleanup.
   # ConfirmOnExit ([General]) suppresses the general quit prompt.
-  # WarnBeforeStoppingStream ([BasicWindow]) suppresses the "stream is active" blocking dialog which is the main cause of SIGTERM being ignored when OBS is streaming.
+  # WarnBeforeStoppingStream ([BasicWindow]) suppresses the "stream is active" blocking dialogue which is the main cause of SIGTERM being ignored when OBS is streaming.
   if [ -f "$OBS_GLOBAL_INI" ]; then
     OBS_CONFIRM_ORIG=$(grep '^ConfirmOnExit=' "$OBS_GLOBAL_INI" | head -1 | cut -d= -f2-) || true
     sed -i '/^ConfirmOnExit=/d' "$OBS_GLOBAL_INI" 2>/dev/null || true
