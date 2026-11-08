@@ -1017,10 +1017,10 @@ main() {
   # WarnBeforeStoppingStream ([BasicWindow]) suppresses the "stream is active" blocking dialog
   # which is the main cause of SIGTERM being ignored when OBS is streaming.
   if [ -f "$OBS_GLOBAL_INI" ]; then
-    OBS_CONFIRM_ORIG=$(grep '^ConfirmOnExit=' "$OBS_GLOBAL_INI" | head -1 | cut -d= -f2-)
+    OBS_CONFIRM_ORIG=$(grep '^ConfirmOnExit=' "$OBS_GLOBAL_INI" | head -1 | cut -d= -f2-) || true
     sed -i '/^ConfirmOnExit=/d' "$OBS_GLOBAL_INI" 2>/dev/null || true
     sed -i 's/^\[General\]$/[General]\nConfirmOnExit=false/' "$OBS_GLOBAL_INI" 2>/dev/null || true
-    OBS_WARN_STOP_STREAM_ORIG=$(grep '^WarnBeforeStoppingStream=' "$OBS_GLOBAL_INI" | head -1 | cut -d= -f2-)
+    OBS_WARN_STOP_STREAM_ORIG=$(grep '^WarnBeforeStoppingStream=' "$OBS_GLOBAL_INI" | head -1 | cut -d= -f2-) || true
     sed -i '/^WarnBeforeStoppingStream=/d' "$OBS_GLOBAL_INI" 2>/dev/null || true
     if grep -q '^\[BasicWindow\]' "$OBS_GLOBAL_INI" 2>/dev/null; then
       sed -i 's/^\[BasicWindow\]$/[BasicWindow]\nWarnBeforeStoppingStream=false/' "$OBS_GLOBAL_INI" 2>/dev/null || true
