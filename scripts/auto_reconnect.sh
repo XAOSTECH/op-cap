@@ -11,6 +11,7 @@ RESTART_OBS=0
 CHECK_INTERVAL=2
 RESET_COUNT=0
 MAX_RESET_ATTEMPTS=3
+RESTART_SENTINEL=""  # optional path; touched before OBS is killed so wrapper skips --safe-mode
 
 while (( "$#" )); do
   case "$1" in
@@ -22,6 +23,8 @@ while (( "$#" )); do
       FFMPEG_SERVICE="$2"; shift 2;;
     --restart-obs)
       RESTART_OBS=1; shift;;
+    --restart-sentinel)
+      RESTART_SENTINEL="$2"; shift 2;;
     *) echo "Unknown option $1"; exit 2;;
   esac
 done
@@ -75,7 +78,7 @@ while true; do
         if [ -n "$drv" ]; then
           echo "Unbinding $busid from $drv"
           echo -n "$busid" > "$device_sys/driver/unbind" 2>/dev/null || true
-          sleep 1
+          sleep 0.3
           echo -n "$busid" > "$device_sys/driver/bind" 2>/dev/null || true
           echo "Rebind attempted"
         fi
@@ -98,12 +101,43 @@ while true; do
 
     # Restart the capture pipeline
     if [ "$RESTART_OBS" -eq 1 ]; then
-      # Wait for the device to reappear (up to 30s) then kill OBS so the wrapper restarts it
+      # Wait for a v4l2 device associated with the VID:PID to reappear, max 4 s.
+      # We scan by VID:PID rather than the original /dev/videoN name because USB
+      # re-enumeration can produce a different minor number after a reset.
       _w=0
-      while ! [ -d "/sys/class/video4linux/$_devname" ] && [ "$_w" -lt 30 ]; do sleep 1; _w=$((_w+1)); done
-      # Kill OBS regardless - if device came back OBS restarts cleanly; if not, restart loop retries
-      echo "Signalling OBS to restart (device ${DEVNODE} $([ -d /sys/class/video4linux/$_devname ] && echo 'back' || echo 'still absent'))..."
-      pkill -TERM -f 'obs.*--safe-mode' 2>/dev/null || pkill -TERM obs 2>/dev/null || true
+      _found_devname=""
+      while [ "$_w" -lt 4 ] && [ -z "$_found_devname" ]; do
+        sleep 1; _w=$((_w+1))
+        if [ -n "$VIDPID" ]; then
+          _vid="${VIDPID%:*}"; _pid="${VIDPID#*:}"
+          _found_devname=$(for _d in /sys/bus/usb/devices/*/idVendor; do
+            _dir=$(dirname "$_d")
+            [ "$(cat "$_dir/idVendor" 2>/dev/null)" = "$_vid" ] || continue
+            [ "$(cat "$_dir/idProduct" 2>/dev/null)" = "$_pid" ] || continue
+            find "$_dir" -maxdepth 6 -name "video*" -path "*/video4linux/*" 2>/dev/null | head -n1
+          done | head -n1 | xargs -r basename)
+        else
+          [ -d "/sys/class/video4linux/$(basename "$DEVNODE")" ] && \
+            _found_devname=$(basename "$DEVNODE")
+        fi
+      done
+      if [ -n "$_found_devname" ]; then
+        echo "Device returned as /dev/$_found_devname after ${_w}s" >&2
+      else
+        echo "Device did not reappear within 4s — signalling OBS to restart anyway" >&2
+      fi
+      # Let the obs-safe-launch wrapper know this is an intentional restart so it can
+      # skip --safe-mode and use a shorter recovery timeout.
+      [ -n "$RESTART_SENTINEL" ] && { touch "$RESTART_SENTINEL" 2>/dev/null || true; }
+      # Kill OBS — match broadly regardless of whether --safe-mode is currently active
+      echo "Signalling OBS to restart (device ${DEVNODE} $( [ -n "$_found_devname" ] && echo 'back' || echo 'still absent'))..." >&2
+      _obs_pid=$(pgrep -n -f 'obs.*--disable-missing-files-check' 2>/dev/null || pgrep -xn obs 2>/dev/null || echo "")
+      if [ -n "$_obs_pid" ]; then
+        kill -TERM "$_obs_pid" 2>/dev/null || true
+        sleep 1
+        # Force-kill if still alive (e.g. streaming-confirm dialog showed up despite ini flag)
+        kill -0 "$_obs_pid" 2>/dev/null && kill -KILL "$_obs_pid" 2>/dev/null || true
+      fi
     elif [ -f "$(dirname "$0")/../ffmpeg/feed.sh" ]; then
       echo "Starting feed ($FFMPEG_SERVICE)"
       systemctl start "$FFMPEG_SERVICE" || bash "$(dirname "$0")/../ffmpeg/feed.sh" &

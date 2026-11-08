@@ -1,4 +1,19 @@
 
+## [0.1.3] - 2026-11-08
+
+### Fixed
+- suppress OBS "stream is active" exit dialog (`WarnBeforeStoppingStream=false` in `[BasicWindow]`), restoring SIGTERM reliability while streaming
+- stop auto-restarting stream after user manually stops it: log-watcher now writes a sentinel so the main loop strips `--startstreaming` from restart args
+- skip `--safe-mode` on wrapper-triggered restarts (reconnect / capture-loss / single Ctrl+C force-quit); genuine OBS crashes still use safe mode
+- cap device-wait in `auto_reconnect.sh` to 4 s and use VID:PID scan instead of original `/dev/videoN` name, so re-enumerated devices are found even when their minor number changes
+- add SIGKILL fallback (after 2 s) in log-watcher kills so a residual dialog never permanently blocks the restart cycle
+- fix `pkill` pattern in `auto_reconnect.sh` to match OBS regardless of `--safe-mode` flag presence
+- reduce unbind→bind sleep from 1 s to 0.3 s and add v4l2 readiness wait (≤ 2 s) before OBS opens the device in no-loopback mode — prevents the capture card's connection graphic appearing on screen
+
+### Changed
+- recovery wait reduced from 3 s to 1 s for intentional (non-crash) restarts, keeping the full disconnect-to-video cycle under 5 s
+- `run_obs` now accepts the safe-mode flag as a positional argument computed in the parent shell, avoiding the pipe-subshell variable-write limitation
+
 ## [0.1.2] - 2026-10-19 (re-release)
 
 ### Added

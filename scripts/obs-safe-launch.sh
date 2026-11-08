@@ -18,17 +18,24 @@ SKIP_DEVICE_CHECK=0
 LOG_DIR="${HOME}/.cache/obs-safe-launch"
 LOG_FILE="$LOG_DIR/obs-crash-$(date +%Y%m%d_%H%M%S).log"
 PID_FILE="/tmp/obs-safe-launch-monitor.pid"
-# Stores original global.ini ConfirmOnExit value so cleanup can restore it
+# Stores original global.ini values so cleanup can restore them
 OBS_GLOBAL_INI="${HOME}/.config/obs-studio/global.ini"
 OBS_CONFIRM_ORIG=""
+OBS_WARN_STOP_STREAM_ORIG=""
 FEED_PID_FILE="/tmp/obs-safe-launch-feed.pid"
 AUDIO_ROUTER_PID_FILE="/tmp/obs-safe-launch-audio-router.pid"
 STREAM_STATE_FILE="/tmp/obs-safe-launch-streaming.state"
+# Sentinel touched whenever the wrapper kills OBS intentionally (vs genuine crash)
+CAPTURE_RESTART_SENTINEL="/tmp/obs-safe-launch-capture-restart"
+# Written by log-watcher subshell when user manually stops the stream
+USER_STOPPED_STREAM_FILE="/tmp/obs-safe-launch-user-stopped-stream"
 MONITOR_INTERVAL=5
 RECOVERY_TIMEOUT=3
 CRASH_THRESHOLD="${OBS_SAFE_LAUNCH_CRASH_LIMIT:-0}"  # 0 = unlimited; non-zero applies per crash event only
 WAS_STREAMING=0
 AUTO_RESUME_ENABLED=1  # Enable auto-resume by default
+# Set to 1 when the wrapper killed OBS intentionally; suppresses --safe-mode on next launch
+SAFE_MODE_OVERRIDE=0
 
 # Loopback config
 LOOPBACK_DEV="/dev/video10"
@@ -422,6 +429,7 @@ start_auto_reconnect() {
       --device "$DEVICE" \
       ${VIDPID:+--vidpid "$VIDPID"} \
       --restart-obs \
+      --restart-sentinel "$CAPTURE_RESTART_SENTINEL" \
       &>> "$LOG_FILE" &
     echo $! > "$PID_FILE"
     log_ok "Device reconnect monitor started (PID: $(cat "$PID_FILE"))"
@@ -443,6 +451,7 @@ start_auto_reconnect() {
     --vidpid "$VIDPID" \
     --device "$DEVICE" \
     --ffmpeg-service "usb-capture-ffmpeg.service" \
+    --restart-sentinel "$CAPTURE_RESTART_SENTINEL" \
     &>> "$LOG_FILE" &
 
   # Save monitor PID
@@ -728,8 +737,10 @@ EOF
 
 # Run OBS process. In --no-device mode, prefer a process-level device sandbox so OBS cannot enumerate /dev/video* even if it probes hardware globally.
 run_obs() {
-  # --startstreaming is silently ignored by OBS when --safe-mode is active (source: LoadData guard)
-  local _safe_flag="--safe-mode"
+  # Safe-mode flag is determined by the caller (main loop) so it is set in the parent shell
+  # rather than a pipe subshell, which cannot propagate variable writes back to the parent.
+  local _safe_flag="${1:---safe-mode}"
+  # --startstreaming is silently ignored by OBS when --safe-mode is active (source: LoadData guard).
   [[ "${OBS_ARGS:-}" =~ "--startstreaming" ]] && _safe_flag=""
 
   if [ "$SKIP_DEVICE_CHECK" -eq 1 ]; then
@@ -795,6 +806,7 @@ handle_obs_exit() {
       log_info "Single interrupt on crash exit — clearing stop flag, attempting recovery"
       STOP_REQUESTED=0
       INTERRUPT_COUNT=0
+      SAFE_MODE_OVERRIDE=1  # user-forced kill is intentional; don't penalise with safe mode
     else
       set -e
       return 1
@@ -825,8 +837,11 @@ handle_obs_exit() {
     else
       log_recovery "Attempting recovery (unlimited mode)"
     fi
-    log_recovery "Waiting ${RECOVERY_TIMEOUT}s before restart..."
-    sleep $RECOVERY_TIMEOUT
+    # Use a short wait for wrapper-induced restarts (reconnect/capture-loss); full timeout for genuine crashes
+    local _recovery_wait=$RECOVERY_TIMEOUT
+    [ "${SAFE_MODE_OVERRIDE:-0}" -eq 1 ] && _recovery_wait=1
+    log_recovery "Waiting ${_recovery_wait}s before restart..."
+    sleep "$_recovery_wait"
 
     # Restart auto-reconnect if it died
     if [ -n "$DEVICE" ]; then
@@ -956,7 +971,6 @@ main() {
   # Watch OBS output for streaming state and capture-source loss.
   # Maintains STREAM_STATE_FILE in real-time so detect_streaming_state works after long sessions.
   # Threshold: ignore stops < 1000 frames (device settings changes take only a few frames).
-  local _sentinel="/tmp/obs-safe-launch-capture-restart"
   ( tail -n 0 -F "$LOG_FILE" 2>/dev/null | \
     grep --line-buffered -E "Stopped capture after|==== Streaming Start|==== Streaming Stop|User stopped the stream" | \
     while IFS= read -r _line; do
@@ -964,40 +978,66 @@ main() {
         *"==== Streaming Start"*)
           echo 1 > "$STREAM_STATE_FILE" ;;
         *"User stopped the stream"*)
-          rm -f "$STREAM_STATE_FILE" ;;
+          rm -f "$STREAM_STATE_FILE"
+          # Tell the main loop not to re-inject --startstreaming on the next restart
+          touch "$USER_STOPPED_STREAM_FILE"
+          ;;
         *"==== Streaming Stop"*)
           # Unexpected stream stop (no User-stopped-stream event preceded it)
           [ -f "$STREAM_STATE_FILE" ] || continue
-          touch "$_sentinel"
+          touch "$CAPTURE_RESTART_SENTINEL"
           _obs_pid=$(pgrep -n -f 'obs.*--disable-missing-files-check' 2>/dev/null || pgrep -xn obs 2>/dev/null || echo "")
-          [ -n "$_obs_pid" ] && kill -TERM "$_obs_pid" 2>/dev/null || true
-          sleep 8
+          if [ -n "$_obs_pid" ]; then
+            kill -TERM "$_obs_pid" 2>/dev/null || true
+            sleep 2
+            # SIGKILL if the streaming-confirm dialog or anything else is still blocking exit
+            kill -0 "$_obs_pid" 2>/dev/null && kill -KILL "$_obs_pid" 2>/dev/null || true
+          fi
+          sleep 5  # debounce: suppress duplicate events while OBS restarts
           ;;
         *"Stopped capture after"*)
           _n=$(echo "$_line" | grep -oE '[0-9]+' | tail -1)
           [ "${_n:-0}" -lt 1000 ] && continue
-          touch "$_sentinel"
+          touch "$CAPTURE_RESTART_SENTINEL"
           _obs_pid=$(pgrep -n -f 'obs.*--disable-missing-files-check' 2>/dev/null || pgrep -xn obs 2>/dev/null || echo "")
-          [ -n "$_obs_pid" ] && kill -TERM "$_obs_pid" 2>/dev/null || true
-          sleep 8
+          if [ -n "$_obs_pid" ]; then
+            kill -TERM "$_obs_pid" 2>/dev/null || true
+            sleep 2
+            kill -0 "$_obs_pid" 2>/dev/null && kill -KILL "$_obs_pid" 2>/dev/null || true
+          fi
+          sleep 5  # debounce
           ;;
       esac
     done ) &
   echo $! >> "$PID_FILE"
   echo ""
 
-  # Disable OBS streaming confirm dialog so SIGTERM exits cleanly; restored in cleanup
+  # Disable OBS exit-confirmation dialogs so SIGTERM always exits cleanly; restored in cleanup.
+  # ConfirmOnExit ([General]) suppresses the general quit prompt.
+  # WarnBeforeStoppingStream ([BasicWindow]) suppresses the "stream is active" blocking dialog
+  # which is the main cause of SIGTERM being ignored when OBS is streaming.
   if [ -f "$OBS_GLOBAL_INI" ]; then
     OBS_CONFIRM_ORIG=$(grep '^ConfirmOnExit=' "$OBS_GLOBAL_INI" | head -1 | cut -d= -f2-)
-    # Remove any existing key and insert false immediately after [General]
     sed -i '/^ConfirmOnExit=/d' "$OBS_GLOBAL_INI" 2>/dev/null || true
     sed -i 's/^\[General\]$/[General]\nConfirmOnExit=false/' "$OBS_GLOBAL_INI" 2>/dev/null || true
+    OBS_WARN_STOP_STREAM_ORIG=$(grep '^WarnBeforeStoppingStream=' "$OBS_GLOBAL_INI" | head -1 | cut -d= -f2-)
+    sed -i '/^WarnBeforeStoppingStream=/d' "$OBS_GLOBAL_INI" 2>/dev/null || true
+    if grep -q '^\[BasicWindow\]' "$OBS_GLOBAL_INI" 2>/dev/null; then
+      sed -i 's/^\[BasicWindow\]$/[BasicWindow]\nWarnBeforeStoppingStream=false/' "$OBS_GLOBAL_INI" 2>/dev/null || true
+    else
+      printf '\n[BasicWindow]\nWarnBeforeStoppingStream=false\n' >> "$OBS_GLOBAL_INI" 2>/dev/null || true
+    fi
   fi
 
   # Main loop: launch OBS, restart on crash
   while [ "$STOP_REQUESTED" -eq 0 ]; do
     export GSETTINGS_SCHEMA_DIR=/usr/share/glib-2.0/schemas
-    # Re-resolve device path in case USB re-enumerated on a different minor number
+    # Re-resolve device path in case USB re-enumerated on a different minor number.
+    # After a reconnect (SAFE_MODE_OVERRIDE=1) also wait briefly for udev to settle and
+    # the v4l2 driver to become responsive before OBS opens the device — this prevents
+    # OBS from grabbing the device before it has finished enumerating, which causes it to
+    # either select the wrong device or show a connection/initialisation graphic from the
+    # capture card.
     if [ "$USE_LOOPBACK" -eq 0 ] && [ -n "${USB_CAPTURE_VIDEO:-}" ]; then
       _newdev=$(readlink -f "${USB_CAPTURE_VIDEO}" 2>/dev/null || true)
       if [ -c "${_newdev:-}" ] && [ "${_newdev}" != "$DEVICE" ]; then
@@ -1011,19 +1051,49 @@ main() {
           done
         fi
       fi
+      # In no-loopback mode, ensure the device is actually v4l2-responsive before OBS starts.
+      # Capped at 2 s (4 × 0.5 s) so the total reconnect-to-video budget stays under 5 s.
+      if [ "${SAFE_MODE_OVERRIDE:-0}" -eq 1 ] && [ -c "${DEVICE:-}" ]; then
+        local _vw=0
+        while ! v4l2-ctl -d "$DEVICE" --get-fmt-video &>/dev/null 2>&1 && [ $_vw -lt 4 ]; do
+          sleep 0.5; _vw=$((_vw+1))
+        done
+        [ $_vw -gt 0 ] && log_info "Device $DEVICE responded after $(echo "scale=1; $_vw * 0.5" | bc)s settle"
+      fi
     fi
 
+    # Determine whether to pass --safe-mode to OBS this iteration.
+    # SAFE_MODE_OVERRIDE=1 means the wrapper killed OBS intentionally (reconnect / capture-loss);
+    # genuine crashes use full safe mode. Reset here (parent shell) so the subshell spawned by
+    # the pipeline below inherits the computed value and writes don't need to propagate back.
+    local _this_safe_flag="--safe-mode"
+    [ "${SAFE_MODE_OVERRIDE:-0}" -eq 1 ] && _this_safe_flag=""
+    SAFE_MODE_OVERRIDE=0  # reset before run_obs so sentinel check can re-arm it for the next restart
+
     set +e  # Disable exit-on-error for OBS execution
-    run_obs 2>&1 | tee -a "$LOG_FILE"
+    run_obs "$_this_safe_flag" 2>&1 | tee -a "$LOG_FILE"
     EXIT_CODE=${PIPESTATUS[0]}
     set -e  # Re-enable exit-on-error
     
     log_info "OBS exited with code: $EXIT_CODE"
 
-    # Treat capture-source-loss kills (exit 0 via SIGTERM) the same as crashes
-    if [ -f "$_sentinel" ]; then
-      rm -f "$_sentinel"
+    # Treat capture-source-loss / reconnect kills (SIGTERM from wrapper) the same as crashes.
+    # Also set SAFE_MODE_OVERRIDE so the next launch skips --safe-mode (intentional restarts
+    # don't need safe mode; genuine crashes do).
+    if [ -f "$CAPTURE_RESTART_SENTINEL" ]; then
+      rm -f "$CAPTURE_RESTART_SENTINEL"
       EXIT_CODE=1
+      SAFE_MODE_OVERRIDE=1
+    fi
+
+    # If the user manually stopped the stream (during or outside a reset cycle), remove
+    # --startstreaming from OBS_ARGS so the next restart doesn't re-engage streaming.
+    if [ -f "$USER_STOPPED_STREAM_FILE" ]; then
+      rm -f "$USER_STOPPED_STREAM_FILE"
+      OBS_ARGS="${OBS_ARGS//--startstreaming/}"
+      OBS_ARGS="${OBS_ARGS# }"  # trim leading space
+      WAS_STREAMING=0
+      log_info "User stopped stream — removed --startstreaming from restart args"
     fi
 
     if [ $EXIT_CODE -eq 0 ]; then
@@ -1054,12 +1124,17 @@ cleanup() {
   stop_auto_reconnect
   usb_reauthorize_device
   # Unload all virtual audio modules and revert OBS profile ini
-  # Restore ConfirmOnExit in global.ini
+  # Restore ConfirmOnExit and WarnBeforeStoppingStream in global.ini
   if [ -f "$OBS_GLOBAL_INI" ]; then
     if [ -n "$OBS_CONFIRM_ORIG" ]; then
       sed -i "/^\[General\]/,/^\[/{s/^ConfirmOnExit=.*/ConfirmOnExit=${OBS_CONFIRM_ORIG}/}" "$OBS_GLOBAL_INI" 2>/dev/null || true
     else
       sed -i '/^\[General\]/,/^\[/{/^ConfirmOnExit=false$/d}' "$OBS_GLOBAL_INI" 2>/dev/null || true
+    fi
+    if [ -n "$OBS_WARN_STOP_STREAM_ORIG" ]; then
+      sed -i "/^\[BasicWindow\]/,/^\[/{s/^WarnBeforeStoppingStream=.*/WarnBeforeStoppingStream=${OBS_WARN_STOP_STREAM_ORIG}/}" "$OBS_GLOBAL_INI" 2>/dev/null || true
+    else
+      sed -i '/^\[BasicWindow\]/,/^\[/{/^WarnBeforeStoppingStream=false$/d}' "$OBS_GLOBAL_INI" 2>/dev/null || true
     fi
   fi
   if command -v pactl >/dev/null 2>&1; then
@@ -1087,7 +1162,8 @@ cleanup() {
   if [ -n "${NO_V4L2_SHIM_DIR:-}" ] && [ -d "$NO_V4L2_SHIM_DIR" ]; then
     rm -rf "$NO_V4L2_SHIM_DIR" || true
   fi
-  rm -f "$PID_FILE" "$STREAM_STATE_FILE" "$AUDIO_ROUTER_PID_FILE" "/tmp/obs-safe-launch-capture-restart"
+  rm -f "$PID_FILE" "$STREAM_STATE_FILE" "$AUDIO_ROUTER_PID_FILE" \
+        "$CAPTURE_RESTART_SENTINEL" "$USER_STOPPED_STREAM_FILE"
   log_info "Shutdown complete"
 }
 
