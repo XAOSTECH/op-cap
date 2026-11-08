@@ -2,11 +2,11 @@
 ## [0.1.3] - 2026-11-08
 
 ### Fixed
-- suppress OBS "stream is active" exit dialog (`WarnBeforeStoppingStream=false` in `[BasicWindow]`), restoring SIGTERM reliability while streaming
+- suppress OBS "stream is active" exit dialogue (`WarnBeforeStoppingStream=false` in `[BasicWindow]`), restoring SIGTERM reliability while streaming
 - stop auto-restarting stream after user manually stops it: log-watcher now writes a sentinel so the main loop strips `--startstreaming` from restart args
 - skip `--safe-mode` on wrapper-triggered restarts (reconnect / capture-loss / single Ctrl+C force-quit); genuine OBS crashes still use safe mode
 - cap device-wait in `auto_reconnect.sh` to 4 s and use VID:PID scan instead of original `/dev/videoN` name, so re-enumerated devices are found even when their minor number changes
-- add SIGKILL fallback (after 2 s) in log-watcher kills so a residual dialog never permanently blocks the restart cycle
+- add SIGKILL fallback (after 2 s) in log-watcher kills so a residual dialogue never permanently blocks the restart cycle
 - fix `pkill` pattern in `auto_reconnect.sh` to match OBS regardless of `--safe-mode` flag presence
 - reduce unbind→bind sleep from 1 s to 0.3 s and add v4l2 readiness wait (≤ 2 s) before OBS opens the device in no-loopback mode — prevents the capture card's connection graphic appearing on screen
 
@@ -20,10 +20,10 @@
 - USB deauthorize capture device in --no-device mode
 
 ### Fixed
-- fix stream auto-resume, eliminate SIGKILL cascade, remove dialogs
-- restore PID-specific SIGKILL to bypass streaming confirm dialog
+- fix stream auto-resume, eliminate SIGKILL cascade, remove dialogues
+- restore PID-specific SIGKILL to bypass streaming confirm dialogue
 - remove SIGKILL fallback that was killing restarted OBS
-- persist streaming state across OBS restarts; force-kill on dialog block
+- persist streaming state across OBS restarts; force-kill on dialogue block
 - threshold and proper restart on capture loss
 - kill and restart OBS on capture source loss
 - reliable disconnect detection and USB reset
