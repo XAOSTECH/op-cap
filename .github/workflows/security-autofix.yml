@@ -6,7 +6,7 @@ name: Security Auto-Fix Bot
 on:
   # Trigger on CodeQL scan completion
   workflow_run:
-    workflows: ["CodeQL Advanced Security"]
+    workflows: ["CodeQL"]
     types:
       - completed
   
@@ -29,7 +29,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

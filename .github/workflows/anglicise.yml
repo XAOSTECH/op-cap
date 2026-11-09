@@ -25,11 +25,11 @@ jobs:
         id: app_token
         uses: actions/create-github-app-token@v3
         with:
-          client-id: ${{ secrets['{{BOT_CLIENT_ID_SECRET}}'] }}
+          client-id: ${{ secrets['XB_CI'] }}
           private-key: ${{ secrets['XB_PK'] }}
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ steps.app_token.outputs.token }}
