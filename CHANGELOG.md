@@ -1,4 +1,28 @@
 
+## [0.1.4] - 2026-11-09
+
+### Fixed
+- clear OBS crash sentinel (`~/.config/obs-studio/.sentinel/run_*`) before every OBS restart;
+  OBS 32+ removed `--disable-shutdown-check` — without this, any SIGKILL leaves the sentinel
+  behind, causing an unattended blocking "Crash Detected" modal on next launch that also
+  silently suppresses `--startstreaming` by forcing safe mode (see obsproject/obs-studio de997b1)
+- fix `(( RESET_COUNT++ ))` in `auto_reconnect.sh`: post-increment evaluates the OLD value (0
+  on first disconnect) which is false in arithmetic context → exit code 1 → `set -e` kills the
+  script on the very first disconnect, explaining why it always needed restarting
+- fix `sudo bash script.sh` → `sudo script.sh` for auto_reconnect.sh; the NOPASSWD sudoers rule
+  covers the direct script path, not `bash script.sh`, so the token-expiry password prompt was
+  unavoidable with the old invocation
+- fix `device_sys=$(... | head -n1)` in `auto_reconnect.sh`: SIGPIPE from `head` with `pipefail`
+  could exit the script when the device was found in sysfs
+- replace `pixelformat=0` (Any) with a FourCC-specific value derived from `CAP_FMT` in all
+  direct-device scene patches; `Any` caused OBS to pick YUYV 2560x1440 instead of MJPG 3840x2160
+  on freshly re-enumerated USB devices
+
+### Added
+- `_obs_pixfmt_for_fourcc()` helper maps FourCC strings (MJPG, NV12, YUYV, P010) to their OBS
+  numeric pixelformat codes (`v4l2_fourcc()` uint32 little-endian integers)
+- `clear_obs_crash_sentinel()` helper; respects `$XDG_CONFIG_HOME` per the OBS source
+
 ## [0.1.3] - 2026-11-08
 
 ### Fixed

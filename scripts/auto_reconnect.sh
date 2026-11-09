@@ -70,7 +70,7 @@ while true; do
     if [ -n "$VIDPID" ]; then
       V=$(echo "$VIDPID" | cut -d: -f1)
       P=$(echo "$VIDPID" | cut -d: -f2)
-      device_sys=$(ls -1 /sys/bus/usb/devices/* | while read D; do if [[ -f $D/idVendor && -f $D/idProduct ]]; then v=$(cat $D/idVendor); p=$(cat $D/idProduct); if [[ "$v" == "$V" && "$p" == "$P" ]]; then echo "$D"; fi; fi; done | head -n1)
+      device_sys=$(ls -1 /sys/bus/usb/devices/* | while read D; do if [[ -f $D/idVendor && -f $D/idProduct ]]; then v=$(cat $D/idVendor); p=$(cat $D/idProduct); if [[ "$v" == "$V" && "$p" == "$P" ]]; then echo "$D"; fi; fi; done | head -n1) || true
       if [ -n "$device_sys" ]; then
         drv=$(basename "$(readlink -f $device_sys/driver 2>/dev/null || true)")
         busid=$(basename "$device_sys")
@@ -85,7 +85,7 @@ while true; do
       fi
     fi
 
-    (( RESET_COUNT++ ))
+    (( RESET_COUNT++ )) || true  # avoid set -e exit when RESET_COUNT was 0 (false in arithmetic)
     if (( RESET_COUNT >= MAX_RESET_ATTEMPTS )); then
       echo "Reached max reset attempts. Attempting 'repair' helper (usb reset + rebind + restart services)."
       # Call our repair helper which will attempt a hub power cycle, usb reset, rebind and restart of services

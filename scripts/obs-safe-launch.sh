@@ -36,6 +36,10 @@ WAS_STREAMING=0
 AUTO_RESUME_ENABLED=1  # Enable auto-resume by default
 # Set to 1 when the wrapper killed OBS intentionally; suppresses --safe-mode on next launch
 SAFE_MODE_OVERRIDE=0
+# OBS crash sentinel directory (obs-studio 32+). Deleting run_* files before restart prevents
+# the blocking "Crash Detected" dialog after an unclean exit (SIGKILL).
+# Respects $XDG_CONFIG_HOME per the OBS source (os_get_config_path).
+OBS_CRASH_SENTINEL_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/obs-studio/.sentinel"
 
 # Loopback config
 LOOPBACK_DEV="/dev/video10"
@@ -306,6 +310,36 @@ setup_virtual_audio() {
   [ -f "$_ini" ] && sed -i "s|=${_src}$|=capture_card_loop|g" "$_ini" 2>/dev/null || true
 }
 
+# Map a V4L2 FourCC string to its OBS numeric pixelformat code (uint32 little-endian).
+# OBS stores the raw v4l2_fourcc() integer in the scene JSON; pixelformat=0 means "Any"
+# which causes the plugin to take the first format the device enumerates — often the wrong one.
+# Add new entries as needed; unknown formats fall back to 0 (auto).
+_obs_pixfmt_for_fourcc() {
+  case "${1^^}" in  # uppercase comparison
+    MJPG|MJPEG)    echo 1196444237 ;;  # v4l2_fourcc('M','J','P','G')
+    NV12)          echo 842094158  ;;  # v4l2_fourcc('N','V','1','2')
+    YUYV|YUV2)     echo 1448695129 ;;  # v4l2_fourcc('Y','U','Y','V')
+    P010)          echo 808530000  ;;  # v4l2_fourcc('P','0','1','0')
+    *)             echo 0          ;;  # Any — let OBS negotiate
+  esac
+}
+
+# Delete OBS crash sentinel files so the next launch does not detect a "crash"
+# and show the blocking "Run in Safe Mode / Normal Mode" modal dialog.
+# Context: OBS 32+ writes ~/.config/obs-studio/.sentinel/run_<UUID> at startup and
+# removes it on clean exit. SIGKILL prevents cleanup, leaving the sentinel behind.
+# Upstream removed --disable-shutdown-check in 32.0 (obsproject/obs-studio de997b1).
+clear_obs_crash_sentinel() {
+  if [ -d "$OBS_CRASH_SENTINEL_DIR" ]; then
+    local _count
+    _count=$(find "$OBS_CRASH_SENTINEL_DIR" -maxdepth 1 -name 'run_*' 2>/dev/null | wc -l)
+    if [ "${_count:-0}" -gt 0 ]; then
+      rm -f "$OBS_CRASH_SENTINEL_DIR"/run_* 2>/dev/null || true
+      log_info "Cleared ${_count} OBS crash sentinel file(s) — unclean-exit flag removed"
+    fi
+  fi
+}
+
 # Start feed.sh: bridge USB device -> v4l2loopback
 start_feed() {
   if [ -z "$DEVICE" ]; then
@@ -425,7 +459,7 @@ start_auto_reconnect() {
   # In no-loopback mode, run auto_reconnect for USB reset/rebind and kill OBS on reconnect
   if [ "$USE_LOOPBACK" -eq 0 ]; then
     log_info "Starting device reconnect monitor for $DEVICE (direct-device mode)..."
-    sudo bash "$BASEDIR/scripts/auto_reconnect.sh" \
+    sudo "$BASEDIR/scripts/auto_reconnect.sh" \
       --device "$DEVICE" \
       ${VIDPID:+--vidpid "$VIDPID"} \
       --restart-obs \
@@ -446,8 +480,9 @@ start_auto_reconnect() {
   fi
 
   log_info "Starting auto-reconnect monitor for $DEVICE (${VIDPID:-device-watch mode})..."
-  # Run auto-reconnect in background
-  sudo bash "$BASEDIR/scripts/auto_reconnect.sh" \
+  # Use direct invocation so the NOPASSWD sudoers rule matches the script path
+  # (rule covers the script directly, not 'bash script.sh').
+  sudo "$BASEDIR/scripts/auto_reconnect.sh" \
     --vidpid "$VIDPID" \
     --device "$DEVICE" \
     --ffmpeg-service "usb-capture-ffmpeg.service" \
@@ -947,13 +982,17 @@ main() {
         fuser -k "$DEVICE" 2>/dev/null || true
         sleep 1
       fi
-      # Patch scene to the physical device so OBS does not open the loopback
+      # Patch scene to the physical device so OBS does not open the loopback.
+      # Use the known working FourCC so OBS doesn't auto-negotiate to the wrong format
+      # (e.g. YUYV instead of MJPG) especially on freshly re-enumerated USB devices.
+      local _pixfmt
+      _pixfmt=$(_obs_pixfmt_for_fourcc "${CAP_FMT:-}")
       local _obs_scenes="${HOME}/.config/obs-studio/basic/scenes"
       if command -v jq >/dev/null 2>&1 && [ -d "$_obs_scenes" ]; then
         for _fp in "$_obs_scenes"/*.json; do
           [ -f "$_fp" ] || continue
-          jq --arg dev "$DEVICE" \
-            '.sources |= map(if .id == "v4l2_input" and ((.settings.device_id // "") | startswith("/dev/")) and .settings.device_id != $dev then .settings.device_id = $dev | .settings.pixelformat = 0 else . end)' \
+          jq --arg dev "$DEVICE" --argjson pfmt "$_pixfmt" \
+            '.sources |= map(if .id == "v4l2_input" and ((.settings.device_id // "") | startswith("/dev/")) and .settings.device_id != $dev then .settings.device_id = $dev | .settings.pixelformat = $pfmt else . end)' \
             "$_fp" > "${_fp}.tmp" 2>/dev/null && mv "${_fp}.tmp" "$_fp" || rm -f "${_fp}.tmp"
         done
       fi
@@ -1038,11 +1077,15 @@ main() {
       if [ -c "${_newdev:-}" ] && [ "${_newdev}" != "$DEVICE" ]; then
         log_info "Device re-enumerated: $DEVICE -> $_newdev"
         DEVICE="$_newdev"
+        local _pixfmt_r
+        _pixfmt_r=$(_obs_pixfmt_for_fourcc "${CAP_FMT:-}")
         local _obs_scenes="${HOME}/.config/obs-studio/basic/scenes"
         if command -v jq >/dev/null 2>&1 && [ -d "$_obs_scenes" ]; then
           for _fp in "$_obs_scenes"/*.json; do
             [ -f "$_fp" ] || continue
-            jq --arg dev "$DEVICE" '.sources |= map(if .id == "v4l2_input" and ((.settings.device_id // "") | startswith("/dev/")) then .settings.device_id = $dev | .settings.pixelformat = 0 else . end)' "$_fp" > "${_fp}.tmp" 2>/dev/null && mv "${_fp}.tmp" "$_fp" || rm -f "${_fp}.tmp"
+            jq --arg dev "$DEVICE" --argjson pfmt "$_pixfmt_r" \
+              '.sources |= map(if .id == "v4l2_input" and ((.settings.device_id // "") | startswith("/dev/")) then .settings.device_id = $dev | .settings.pixelformat = $pfmt else . end)' \
+              "$_fp" > "${_fp}.tmp" 2>/dev/null && mv "${_fp}.tmp" "$_fp" || rm -f "${_fp}.tmp"
           done
         fi
       fi
@@ -1063,6 +1106,13 @@ main() {
     local _this_safe_flag="--safe-mode"
     [ "${SAFE_MODE_OVERRIDE:-0}" -eq 1 ] && _this_safe_flag=""
     SAFE_MODE_OVERRIDE=0  # reset before run_obs so sentinel check can re-arm it for the next restart
+
+    # Always clear the OBS crash sentinel before launch so the "Crash Detected" blocking
+    # dialog never appears. OBS 32+ removed --disable-shutdown-check; the only bypass is
+    # deleting ~/.config/obs-studio/.sentinel/run_* before startup.
+    # Without this, any SIGKILL (including intentional reconnect kills) triggers the modal,
+    # blocking the restart indefinitely — and --startstreaming is also ignored in safe mode.
+    clear_obs_crash_sentinel
 
     set +e  # Disable exit-on-error for OBS execution
     run_obs "$_this_safe_flag" 2>&1 | tee -a "$LOG_FILE"
