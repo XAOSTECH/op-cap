@@ -1,5 +1,22 @@
 # op-cap — Linux USB Capture Card Optimisation
 
+<p align="center">
+  <a href="https://github.com/XAOSTECH/op-cap"><img alt="GitHub repo" src="https://img.shields.io/badge/GitHub-XAOSTECH%2Fop-cap-181717?style=for-the-badge&logo=github"></a>
+  <a href="https://github.com/XAOSTECH/op-cap/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/XAOSTECH/op-cap?style=for-the-badge&logo=semantic-release&color=blue"></a>
+  <a href="https://github.com/XAOSTECH/op-cap/blob/main/LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-green?style=for-the-badge"></a>
+</p>
+
+
+
+
+
+
+
+
+
+
+
+
 Stabilise high-throughput USB capture devices for OBS on Linux. Provides auto-reconnect, USB reset, v4l2loopback feed isolation, and performance optimisations.
 
 ## Features

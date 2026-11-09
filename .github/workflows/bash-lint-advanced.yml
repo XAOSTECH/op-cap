@@ -184,7 +184,7 @@ jobs:
         id: app_token
         uses: actions/create-github-app-token@v3
         with:
-          client-id: ${{ secrets['{{SECURITY_CLIENT_ID_SECRET}}'] }}
+          client-id: ${{ secrets['XSS_CI'] }}
           private-key: ${{ secrets['XSS_PK'] }}
 
       - name: Setup bot identity for signing
@@ -194,7 +194,7 @@ jobs:
           gpg-private-key: ${{ secrets['XB_GK'] }}
           gpg-passphrase: ${{ secrets['XB_GP'] }}
           user-token: ${{ secrets['XB_UT'] }}
-          bot-name: xaos-bot
+          bot-name: ${{ vars.BOT_NAME || 'xaos-bot' }}
 
       - name: Run ShellCheck to find issues
         id: check
@@ -221,8 +221,8 @@ jobs:
           set -euo pipefail
           
           # Configure git for commits
-          git config user.name "xaos-bot"
-          git config user.email "dev@xaostech.com"
+          git config user.name "${{ vars.BOT_NAME || 'xaos-bot' }}"
+          git config user.email "262248812+xaos-bot@users.noreply.github.com"
           git config user.signingkey "$(git config user.signingkey)"
           
           # Check if there are changes
