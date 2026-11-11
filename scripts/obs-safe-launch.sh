@@ -787,7 +787,7 @@ run_obs() {
         --property=ProtectControlGroups=yes \
         --property=ProtectKernelTunables=yes \
         --quiet \
-        obs $_safe_flag --disable-missing-files-check $OBS_ARGS
+        obs "$_safe_flag" --disable-missing-files-check "$OBS_ARGS"
       return $?
     fi
 
@@ -800,12 +800,12 @@ run_obs() {
     if [ -f "$_shim" ]; then
       local _preload="${LD_PRELOAD:+$LD_PRELOAD:}$_shim"
       HIDE_V4L2_DEVICE="$DEVICE" LD_PRELOAD="$_preload" \
-        obs $_safe_flag --disable-missing-files-check $OBS_ARGS
+        obs "$_safe_flag" --disable-missing-files-check "$OBS_ARGS"
       return $?
     fi
   fi
 
-  obs $_safe_flag --disable-missing-files-check $OBS_ARGS
+  obs "$_safe_flag" --disable-missing-files-check "$OBS_ARGS"
 }
 
 # Check if OBS was streaming via websocket or log file
@@ -1139,7 +1139,7 @@ main() {
       log_info "User stopped stream — removed --startstreaming from restart args"
     fi
 
-    if [ $EXIT_CODE -eq 0 ]; then
+    if [ "$EXIT_CODE" -eq 0 ]; then
       log_info "OBS exited normally"
       break
     else

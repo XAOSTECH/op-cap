@@ -38,11 +38,11 @@ for dev in /sys/bus/usb/devices/*; do
     if [ "$v" == "$VID" ] && [ "$p" == "$PID" ]; then
       echo "Found device: $dev"
       echo "  idVendor=$v idProduct=$p"
-      echo "  product name: $(cat $dev/product 2>/dev/null || echo N/A)"
-      echo "  manufacturer: $(cat $dev/manufacturer 2>/dev/null || echo N/A)"
-      echo "  driver: $(basename $(readlink -f $dev/driver 2>/dev/null) || echo N/A)"
-      echo "  authorized: $(cat $dev/authorized 2>/dev/null || echo N/A)"
-      echo "  power/control: $(cat $dev/power/control 2>/dev/null || echo N/A)"
+      echo "  product name: $(cat "$dev"/product 2>/dev/null || echo N/A)"
+      echo "  manufacturer: $(cat "$dev"/manufacturer 2>/dev/null || echo N/A)"
+      echo "  driver: $(basename $(readlink -f "$dev"/driver 2>/dev/null) || echo N/A)"
+      echo "  authorized: $(cat "$dev"/authorized 2>/dev/null || echo N/A)"
+      echo "  power/control: $(cat "$dev"/power/control 2>/dev/null || echo N/A)"
 
       # related video devices
       echo "  Video devices (scan /dev):"

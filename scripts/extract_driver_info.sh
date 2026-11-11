@@ -26,7 +26,7 @@ VID=$(echo "$VID_PID" | grep -oE "VID_[0-9A-F]+" | cut -d_ -f2)
 PID=$(echo "$VID_PID" | grep -oE "PID_[0-9A-F]+" | cut -d_ -f2)
 
 # Format as lsusb shows it (hexadecimal, lowercase)
-VIDPID_READABLE="$(echo $VID | tr 'A-Z' 'a-z'):$(echo $PID | tr 'A-Z' 'a-z')"
+VIDPID_READABLE="$(echo "$VID" | tr 'A-Z' 'a-z'):$(echo "$PID" | tr 'A-Z' 'a-z')"
 
 cat > "$DRIVER_DOC" << EOF
 # UGREEN USB Capture Device - Official Driver Information

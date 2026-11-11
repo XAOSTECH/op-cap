@@ -12,7 +12,7 @@ fi
 VID=$(echo "$1" | cut -d: -f1)
 PID=$(echo "$1" | cut -d: -f2)
 
-device_sys=$(ls -d /sys/bus/usb/devices/* 2>/dev/null | while read D; do if [ -f "$D/idVendor" -a -f "$D/idProduct" ]; then v=$(cat $D/idVendor); p=$(cat $D/idProduct); if [[ "$v" == "$VID" && "$p" == "$PID" ]]; then echo "$D"; fi; fi; done | head -n1)
+device_sys=$(ls -d /sys/bus/usb/devices/* 2>/dev/null | while read D; do if [ -f "$D/idVendor" -a -f "$D/idProduct" ]; then v=$(cat "$D"/idVendor); p=$(cat "$D"/idProduct); if [[ "$v" == "$VID" && "$p" == "$PID" ]]; then echo "$D"; fi; fi; done | head -n1)
 if [ -z "$device_sys" ]; then
   echo "Device not found"
   exit 3
