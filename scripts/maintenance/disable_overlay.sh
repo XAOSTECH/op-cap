@@ -14,7 +14,7 @@ fi
 
 # show controls
 if [ -x "$(command -v v4l2-ctl)" ]; then
-  echo "v4l2 controls for $DEV:"; v4l2-ctl -d $DEV --list-ctrls; echo
+  echo "v4l2 controls for $DEV:"; v4l2-ctl -d "$DEV" --list-ctrls; echo
 else
   echo "v4l2-ctl not installed; install v4l-utils"
 fi
@@ -23,7 +23,7 @@ fi
 if command -v uvcdynctrl >/dev/null 2>&1; then
   for ctrl in "Processing" "Overlay" "OSD" "Logo" "Privacy"; do
     echo "Trying uvcdynctrl for $ctrl"
-    uvcdynctrl -d $DEV -s "$ctrl" 0 2>/dev/null || true
+    uvcdynctrl -d "$DEV" -s "$ctrl" 0 2>/dev/null || true
   done
 fi
 
@@ -31,7 +31,7 @@ fi
 v4l2_known_ctrls=("exposure_auto" "gain" "white_balance_temperature_auto" "power_line_frequency" "brightness" "sharpness" "contrast" "saturation")
 for c in "${v4l2_known_ctrls[@]}"; do
   echo "Checking and printing $c"
-  v4l2-ctl -d $DEV --get-ctrl=$c 2>/dev/null || true
+  v4l2-ctl -d "$DEV" --get-ctrl="$c" 2>/dev/null || true
 done
 
 # Finally, advise crop or delogo via FFmpeg if control not present

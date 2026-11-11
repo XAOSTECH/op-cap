@@ -90,9 +90,9 @@ dmesg | grep -iE "usb.*error|xhci.*error|uvc.*error" | tail -5 || echo "  No rec
 # 6. Report device info
 echo ""
 echo "Device info:"
-[ -f "$SYSDEV/product" ] && echo "  Product: $(cat $SYSDEV/product)"
-[ -f "$SYSDEV/manufacturer" ] && echo "  Manufacturer: $(cat $SYSDEV/manufacturer)"
-[ -f "$SYSDEV/bcdUSB" ] && echo "  USB Version: $(cat $SYSDEV/bcdUSB)"
+[ -f "$SYSDEV/product" ] && echo "  Product: $(cat "$SYSDEV"/product)"
+[ -f "$SYSDEV/manufacturer" ] && echo "  Manufacturer: $(cat "$SYSDEV"/manufacturer)"
+[ -f "$SYSDEV/bcdUSB" ] && echo "  USB Version: $(cat "$SYSDEV"/bcdUSB)"
 
 # 7. System-wide USB optimisations
 echo ""

@@ -222,8 +222,8 @@ if [[ "$1" =~ ^[0-9a-fA-F]{4}:[0-9a-fA-F]{4}$ ]]; then
     echo "No usb device found for $1"
     exit 2
   fi
-  bus=$(cat /sys/bus/usb/devices/$busdev/busnum)
-  dev=$(cat /sys/bus/usb/devices/$busdev/devnum)
+  bus=$(cat /sys/bus/usb/devices/"$busdev"/busnum)
+  dev=$(cat /sys/bus/usb/devices/"$busdev"/devnum)
   BUS=$(printf "%03d" "$bus")
   DEV=$(printf "%03d" "$dev")
   device_node="/dev/bus/usb/$BUS/$DEV"

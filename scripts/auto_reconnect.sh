@@ -70,9 +70,9 @@ while true; do
     if [ -n "$VIDPID" ]; then
       V=$(echo "$VIDPID" | cut -d: -f1)
       P=$(echo "$VIDPID" | cut -d: -f2)
-      device_sys=$(ls -1 /sys/bus/usb/devices/* | while read D; do if [[ -f $D/idVendor && -f $D/idProduct ]]; then v=$(cat $D/idVendor); p=$(cat $D/idProduct); if [[ "$v" == "$V" && "$p" == "$P" ]]; then echo "$D"; fi; fi; done | head -n1) || true
+      device_sys=$(ls -1 /sys/bus/usb/devices/* | while read D; do if [[ -f $D/idVendor && -f $D/idProduct ]]; then v=$(cat "$D"/idVendor); p=$(cat "$D"/idProduct); if [[ "$v" == "$V" && "$p" == "$P" ]]; then echo "$D"; fi; fi; done | head -n1) || true
       if [ -n "$device_sys" ]; then
-        drv=$(basename "$(readlink -f $device_sys/driver 2>/dev/null || true)")
+        drv=$(basename "$(readlink -f "$device_sys"/driver 2>/dev/null || true)")
         busid=$(basename "$device_sys")
         echo "Device sys path: $device_sys driver: $drv busid: $busid"
         if [ -n "$drv" ]; then
