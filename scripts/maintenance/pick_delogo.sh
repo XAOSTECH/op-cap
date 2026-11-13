@@ -31,10 +31,10 @@ if [[ "$choice" =~ ^[Yy]$ ]] || [[ "$choice" == "" ]]; then
     echo "No selection captured; aborting"
     exit 3
   fi
-  X=$(echo $RECT | cut -d: -f1)
-  Y=$(echo $RECT | cut -d: -f2)
-  W=$(echo $RECT | cut -d: -f3)
-  H=$(echo $RECT | cut -d: -f4)
+  X=$(echo "$RECT" | cut -d: -f1)
+  Y=$(echo "$RECT" | cut -d: -f2)
+  W=$(echo "$RECT" | cut -d: -f3)
+  H=$(echo "$RECT" | cut -d: -f4)
 else
   read -rp "Enter x: " X
   read -rp "Enter y: " Y
