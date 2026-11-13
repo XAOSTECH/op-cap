@@ -33,7 +33,7 @@ if [ -f "$_SHIM_SO" ]; then
   FFMPEG_LD_PRELOAD="$_SHIM_SO"
 else
   echo "  WARN: v4l2-hdr-shim.so not found at $_SHIM_SO — loopback colorspace will be sRGB"
-  echo "        Build with: make -C $(dirname $_SHIM_SO) shim"
+  echo "        Build with: make -C $(dirname "$_SHIM_SO") shim"
 fi
 
 # Optional overlay image (set via env, e.g. USB_CAPTURE_OVERLAY_URL or USB_CAPTURE_OVERLAY_FILE)
@@ -170,25 +170,25 @@ else
     LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
     ffmpeg -hide_banner -loglevel info \
       -thread_queue_size 8 \
-      -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
-      $OVERLAY_INPUT \
+      -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" "$INPUT_FMT_OPT" "$HDR_INPUT_OPTS" -i "$IN" \
+      "$OVERLAY_INPUT" \
       -filter_complex "$FILTER_COMPLEX" \
-      -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
+      -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" "$HDR_OUTPUT_OPTS" \
       -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
   elif [ -n "$FINAL_VF" ]; then
     LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
     ffmpeg -hide_banner -loglevel info \
       -thread_queue_size 8 \
-      -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
+      -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" "$INPUT_FMT_OPT" "$HDR_INPUT_OPTS" -i "$IN" \
       -vf "$FINAL_VF" \
-      -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
+      -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" "$HDR_OUTPUT_OPTS" \
       -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
   else
     LD_PRELOAD="${FFMPEG_LD_PRELOAD}" V4L2_HDR_SHIM_DEVICE="$OUT" \
     ffmpeg -hide_banner -loglevel info \
       -thread_queue_size 8 \
-      -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" $INPUT_FMT_OPT $HDR_INPUT_OPTS -i "$IN" \
-      -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" $HDR_OUTPUT_OPTS \
+      -f v4l2 -framerate "$FPS" -video_size "$VID_SIZE" "$INPUT_FMT_OPT" "$HDR_INPUT_OPTS" -i "$IN" \
+      -vcodec rawvideo -pix_fmt "$OUTPUT_PIX_FMT" -r "$FPS" "$HDR_OUTPUT_OPTS" \
       -f v4l2 -nostdin "$OUT" || echo "FFmpeg stopped"
   fi
 fi
