@@ -19,8 +19,7 @@ while (($#)); do
 Usage: generate_obs_aliases.sh [--basedir /path/to/op-cap] [--remove]
 
 Installs host launchers in /usr/local/bin:
-  sobs -> safe OBS with --no-loopback --no-device
-  cobs -> choose /dev/video* and launch safe OBS with --device=<selection>
+sobs -> safe OBS with --no-loopback --no-device cobs -> choose /dev/video* and launch safe OBS with --device=<selection>
 
 Set OBS_SAFE_BASEDIR to override project path at runtime.
 EOF
