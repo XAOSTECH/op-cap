@@ -36,8 +36,7 @@ WAS_STREAMING=0
 AUTO_RESUME_ENABLED=1  # Enable auto-resume by default
 # Set to 1 when the wrapper killed OBS intentionally; suppresses --safe-mode on next launch
 SAFE_MODE_OVERRIDE=0
-# OBS crash sentinel directory (obs-studio 32+). Deleting run_* files before restart prevents
-# the blocking "Crash Detected" dialog after an unclean exit (SIGKILL).
+# OBS crash sentinel directory (obs-studio 32+). Deleting run_* files before restart prevents the blocking "Crash Detected" dialog after an unclean exit (SIGKILL).
 # Respects $XDG_CONFIG_HOME per the OBS source (os_get_config_path).
 OBS_CRASH_SENTINEL_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/obs-studio/.sentinel"
 
@@ -311,8 +310,7 @@ setup_virtual_audio() {
 }
 
 # Map a V4L2 FourCC string to its OBS numeric pixelformat code (uint32 little-endian).
-# OBS stores the raw v4l2_fourcc() integer in the scene JSON; pixelformat=0 means "Any"
-# which causes the plugin to take the first format the device enumerates — often the wrong one.
+# OBS stores the raw v4l2_fourcc() integer in the scene JSON; pixelformat=0 means "Any" which causes the plugin to take the first format the device enumerates — often the wrong one.
 # Add new entries as needed; unknown formats fall back to 0 (auto).
 _obs_pixfmt_for_fourcc() {
   case "${1^^}" in  # uppercase comparison
@@ -324,10 +322,8 @@ _obs_pixfmt_for_fourcc() {
   esac
 }
 
-# Delete OBS crash sentinel files so the next launch does not detect a "crash"
-# and show the blocking "Run in Safe Mode / Normal Mode" modal dialog.
-# Context: OBS 32+ writes ~/.config/obs-studio/.sentinel/run_<UUID> at startup and
-# removes it on clean exit. SIGKILL prevents cleanup, leaving the sentinel behind.
+# Delete OBS crash sentinel files so the next launch does not detect a "crash" and show the blocking "Run in Safe Mode / Normal Mode" modal dialog.
+# Context: OBS 32+ writes ~/.config/obs-studio/.sentinel/run_<UUID> at startup and removes it on clean exit. SIGKILL prevents cleanup, leaving the sentinel behind.
 # Upstream removed --disable-shutdown-check in 32.0 (obsproject/obs-studio de997b1).
 clear_obs_crash_sentinel() {
   if [ -d "$OBS_CRASH_SENTINEL_DIR" ]; then
@@ -1107,11 +1103,8 @@ main() {
     [ "${SAFE_MODE_OVERRIDE:-0}" -eq 1 ] && _this_safe_flag=""
     SAFE_MODE_OVERRIDE=0  # reset before run_obs so sentinel check can re-arm it for the next restart
 
-    # Always clear the OBS crash sentinel before launch so the "Crash Detected" blocking
-    # dialog never appears. OBS 32+ removed --disable-shutdown-check; the only bypass is
-    # deleting ~/.config/obs-studio/.sentinel/run_* before startup.
-    # Without this, any SIGKILL (including intentional reconnect kills) triggers the modal,
-    # blocking the restart indefinitely — and --startstreaming is also ignored in safe mode.
+    # Always clear the OBS crash sentinel before launch so the "Crash Detected" blocking dialog never appears. OBS 32+ removed --disable-shutdown-check; the only bypass is deleting ~/.config/obs-studio/.sentinel/run_* before startup.
+    # Without this, any SIGKILL (including intentional reconnect kills) triggers the modal, blocking the restart indefinitely — and --startstreaming is also ignored in safe mode.
     clear_obs_crash_sentinel
 
     set +e  # Disable exit-on-error for OBS execution
