@@ -18,20 +18,22 @@
   numeric pixelformat codes (`v4l2_fourcc()` uint32 little-endian integers)
 - `clear_obs_crash_sentinel()` helper; respects `$XDG_CONFIG_HOME` per the OBS source
 
-## [0.1.3] - 2026-11-08
+## [0.1.3] - 2026-11-16 (re-release)
 
 ### Fixed
-- suppress OBS "stream is active" exit dialogue (`WarnBeforeStoppingStream=false` in `[BasicWindow]`), restoring SIGTERM reliability while streaming
-- stop auto-restarting stream after user manually stops it: log-watcher now writes a sentinel so the main loop strips `--startstreaming` from restart args
-- skip `--safe-mode` on wrapper-triggered restarts (reconnect / capture-loss / single Ctrl+C force-quit); genuine OBS crashes still use safe mode
-- cap device-wait in `auto_reconnect.sh` to 4 s and use VID:PID scan instead of original `/dev/videoN` name, so re-enumerated devices are found even when their minor number changes
-- add SIGKILL fallback (after 2 s) in log-watcher kills so a residual dialogue never permanently blocks the restart cycle
-- fix `pkill` pattern in `auto_reconnect.sh` to match OBS regardless of `--safe-mode` flag presence
-- reduce unbind→bind sleep from 1 s to 0.3 s and add v4l2 readiness wait (≤ 2 s) before OBS opens the device in no-loopback mode — prevents the capture card's connection graphic appearing on screen
+- apply automated ShellCheck and CodeQL remediation
+- resolve crash dialog, reconnect loop death, sudo expiry, wrong format
+- prevent set -e exit when OBS ini keys are absent
+- resolve notification loops and restart issues
+- restart OBS on unexpected streaming stop
+- confirm dialog, device re-enumeration, monitor service
 
 ### Changed
-- recovery wait reduced from 3 s to 1 s for intentional (non-crash) restarts, keeping the full disconnect-to-video cycle under 5 s
-- `run_obs` now accepts the safe-mode flag as a positional argument computed in the parent shell, avoiding the pipe-subshell variable-write limitation
+- chore: humanise hard-wrapped comments and prose
+- chore(dc-init): update workflows,actions,docs
+- Potential fix for code scanning alert no. 2: Uncontrolled data used in path expression
+- chore(dc-init): update workflows,actions
+- chore: convert American spellings to British English
 
 ## [0.1.2] - 2026-10-19 (re-release)
 
